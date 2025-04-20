@@ -156,17 +156,12 @@ class Airline {
 	int numAircrafts;
 	int numFlights;
 	vector<Flight> flights;
-	vector<Runway> runways;
 
 public:
 	Airline() : numAircrafts(0), numFlights(0) {}
 
 	Airline(string name, string type, int numAircrafts, int numFlights)
 		: name(name), type(type), numAircrafts(numAircrafts), numFlights(numFlights) {}
-
-	void addRunway(const Runway& runway) {
-		runways.push_back(runway);
-	}
 
 	void addFlight(const Flight& flight) {
 		flights.push_back(flight);
@@ -198,8 +193,6 @@ int main() {
 	};
 
 	Airline airline1("PIA", "Commercial", aircrafts.size(), 0);
-	airline1.addRunway(rwyA);
-	airline1.addRunway(rwyB);
 
 	cout << "--- Airline Info ---\n";
 	airline1.print();
