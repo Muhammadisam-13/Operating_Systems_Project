@@ -6,12 +6,15 @@
 #include <queue>
 #include <chrono>
 #include <thread>
-
-
-
-pthread_mutex_t mutex;
 using namespace std;
 
+// Mutexes for synchronization of flights
+pthread_mutex_t mutexA;
+pthread_mutex_t mutexB;
+pthread_mutex_t mutexC;
+pthread_mutex_t print_mutex;
+
+// Colors
 string black = "\033[30m";
 string red = "\033[1;31m";
 string green = "\033[1;32m";
@@ -235,13 +238,6 @@ public:
 		return name;
 	}
 };
-
-
-// Mutexes for synchronization of flights
-pthread_mutex_t mutexA;
-pthread_mutex_t mutexB;
-pthread_mutex_t mutexC;
-pthread_mutex_t print_mutex;
 
 void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex){	
 	f->setCurrentPhase(phase);
