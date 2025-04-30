@@ -6,6 +6,7 @@
 #include <queue>
 #include <chrono>
 #include <thread>
+#include <unordered_map>
 using namespace std;
 
 // Mutexes for synchronization of flights
@@ -138,50 +139,50 @@ public:
                 AVNStatus = true;
             }
             else if (currentPhase == "Approach" && (speed > 290 || speed < 240)) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Approach Phase Violation: Speed " << speed << " km/h is outside the 240-290 km/h range." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Approach Phase Violation: Speed " << speed << " km/h is outside the 240-290 km/h range." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Landing" && (speed > 240 || speed < 30)) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Landing Phase Violation: Speed " << speed << " km/h is outside the 30-240 km/h range." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Landing Phase Violation: Speed " << speed << " km/h is outside the 30-240 km/h range." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Taxi" && speed > 30) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "At Gate" && speed > 10) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << default_text << endl;
                 AVNStatus = true;
             }
         }
         else if (assignedRunwayPtr->getRunwayID() == "RWY-B") {
             if (currentPhase == "At Gate" && speed > 10) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Taxi" && speed > 30) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Takeoff Roll" && (speed > 290)) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Takeoff Roll Phase Violation: Speed " << speed << " km/h exceeds limit of 290 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Takeoff Roll Phase Violation: Speed " << speed << " km/h exceeds limit of 290 km/h." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Climb" && (speed > 463)) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Climb Phase Violation: Speed " << speed << " km/h exceeds limit of 463 km/h." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Climb Phase Violation: Speed " << speed << " km/h exceeds limit of 463 km/h." << default_text << endl;
                 AVNStatus = true;
             }
             else if (currentPhase == "Cruise" && (speed > 900 || speed < 800)) {
-                cout << red << "[ " << flightID << " ]" << default_text
-                    << " Cruise Phase Violation: Speed " << speed << " km/h is outside the 800-900 km/h range." << endl;
+                cout << red << "[ " << flightID << " ]"
+                    << " Cruise Phase Violation: Speed " << speed << " km/h is outside the 800-900 km/h range." << default_text << endl;
                 AVNStatus = true;
             }
         }
@@ -257,7 +258,6 @@ void* handleFlight(void* arg){
 
 	pthread_mutex_t* mutex = nullptr;
 
-	// Check which mutex to lock based on runway id
 	if(runway->getRunwayID() == "RWY-A"){
 		mutex = &mutexA;
 	}
@@ -267,22 +267,18 @@ void* handleFlight(void* arg){
 	else if(runway->getRunwayID() == "RWY-C"){
 		mutex = &mutexC;
 	}
-	cout << "[ " << f->getID() << " ] Requesting runway " << runway->getRunwayID() << "\n";
-	// sleep(1);
-	pthread_mutex_lock(mutex); // arrived flight locks the runway and other flights wait until the first one unlocks
+
+	// pthread_mutex_lock(mutex);
+	
+
+	cout << yellow << "[ " << f->getID() << " ] Requesting runway " << runway->getRunwayID() << default_text << "\n";
 
 	if(!runway->isOccupied()){
-		
-		cout << "[ " << f->getID() << " ] Runway assigned.\n";
-			runway->setOccupied(true);
+		cout << green << "[ " << f->getID() << " ] Runway assigned.\n" << default_text;
+		runway->setOccupied(true);
 	}
 
-	
-	// sleep(1);
-
 	int randspeed;
-	
-
 	if (f->getDirection() == "North" || f->getDirection() == "South") {
 		sleep(1);
 		randspeed = rand() % 500 + 100;
@@ -292,15 +288,16 @@ void* handleFlight(void* arg){
 		randspeed = rand() % 260 + 40;
 		simulatePhase("Approach", f, randspeed, mutex);
 
-		// unlock runway 
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
-
+		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 200;
 		simulatePhase("Landing", f, randspeed, mutex);
-		
 
+		// unlock runway 
+		runway->setOccupied(false);
+		pthread_mutex_unlock(mutex);
+		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
+		
 		sleep(1);
 		randspeed = rand() % 20;
 		simulatePhase("Taxi", f, randspeed, mutex);
@@ -318,15 +315,15 @@ void* handleFlight(void* arg){
 		randspeed = rand() % 20;
 		simulatePhase("Taxi", f, randspeed, mutex);
 
-		// unlock runway 
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
-
+		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
 		simulatePhase("Takeoff Roll", f, randspeed, mutex);
 
-		
+		// unlock runway 
+		runway->setOccupied(false);
+		pthread_mutex_unlock(mutex);
+		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
@@ -345,12 +342,14 @@ void* handleFlight(void* arg){
 		randspeed = rand() % 20;
 		simulatePhase("Taxi", f, randspeed, mutex);
 
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
-
+		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
 		simulatePhase("Takeoff Roll", f, randspeed, mutex);
+
+		runway->setOccupied(false);
+		pthread_mutex_unlock(mutex);
+		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
@@ -361,24 +360,24 @@ void* handleFlight(void* arg){
 		simulatePhase("Departure", f, randspeed, mutex);
 	}
 
-	pthread_mutex_lock(mutex);
-	runway->setOccupied(false);
+	// pthread_mutex_lock(mutex);
+	// runway->setOccupied(false);
 
-	if(runway->getRunwayID() == "RWY-A"){
-		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
-	}
-	else if(runway->getRunwayID() == "RWY-B"){
-		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
-	}
-	else if(runway->getRunwayID() == "RWY-C"){
-		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
-	}
+	// // if(runway->getRunwayID() == "RWY-A"){
+	// // 	cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
+	// // }
+	// // else if(runway->getRunwayID() == "RWY-B"){
+	// // 	cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
+	// // }
+	// // else if(runway->getRunwayID() == "RWY-C"){
+	// // 	cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
+	// // }
 
-	pthread_mutex_unlock(mutex);
+	// pthread_mutex_unlock(mutex);
 	pthread_exit(NULL);
 }
 
-class AirTrafficControl {
+class ATC {
 private:
 	Runway rwyA;
 	Runway rwyB;
@@ -389,7 +388,7 @@ private:
 	vector<pthread_t> flightThreads;
 	vector<Flight*> allFlights;
 public:
-	AirTrafficControl()
+	ATC()
 	: rwyA("RWY-A", false), rwyB("RWY-B", false), rwyC("RWY-C", false) {
 		pthread_mutex_init(&mutexA, NULL);
 		pthread_mutex_init(&mutexB, NULL);
@@ -417,6 +416,8 @@ public:
 		// PIA Flights
 		vector<Flight*> piaFlights = {
 			new Flight("PK-123", "Passenger", "North", 400, "Holding", &rwyA, aircraftsPia[0]),
+			new Flight("PK-713", "Passenger", "North", 400, "Holding", &rwyA, aircraftsPia[1]),
+			new Flight("PK-234", "Passenger", "North", 400, "Holding", &rwyA, aircraftsPia[0]),
 			new Flight("PK-456", "Passenger", "East", 0, "At Gate", &rwyB, aircraftsPia[1])
 		};
 	
@@ -552,7 +553,7 @@ public:
 
 int main() {
 	srand(time(0));
-	AirTrafficControl atc;
+	ATC atc;
 	atc.initializeSystem();
 	
 	// atc.addFlight("PIA", "Passenger", "North", "12:00");
