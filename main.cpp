@@ -92,9 +92,9 @@ public:
 
 class Flight {
 	// New data members
-	string priority;
+    int priority; // 0 is Emergency, 1 is VIP, 2 is Cargo, 3 is Commercial
 	string scheduledTime;
-	
+
 
 
 	string flightID;
@@ -106,16 +106,26 @@ class Flight {
 	Runway* assignedRunwayPtr;
 	Aircraft aircraft;
 
-	
+
 
 public:
-	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr) {}
+	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr), priority(3) {}
 
 	Flight(string flightID, string flightType, string direction, int speed,
 		string currentPhase, Runway* runwayPtr, Aircraft aircraft)
 		: flightID(flightID), flightType(flightType), direction(direction),
 		speed(speed), currentPhase(currentPhase), assignedRunwayPtr(runwayPtr),
-		AVNStatus(false), aircraft(aircraft) {}
+		AVNStatus(false), aircraft(aircraft)
+        {
+            if(flightType == "Passenger")
+            {
+                priority = 3;
+            }
+            else if(flightType == "Cargo")
+            {
+                priority = 2;
+            }
+        }
 
 	void print() const {
 		cout << "\033[1;36m" << "--- Flight " << flightID << " Status ---" << "\033[0m" << endl;
@@ -126,10 +136,40 @@ public:
 		cout << "Current Phase: " << currentPhase << endl;
 		// cout << "Operation Type: " << (isArrival ? "Arrival" : "Departure") << endl;
 		cout << "AVN Status: " << (AVNStatus ? "\033[1;31mActive\033[0m" : "\033[1;32mInactive\033[0m") << endl;
-		cout << "Assigned Runway: " << assignedRunwayPtr->getRunwayID() << endl;
+        if (assignedRunwayPtr) 
+        {
+            cout << "Assigned Runway: " << assignedRunwayPtr->getRunwayID() << endl;
+        } else 
+        {
+            cout << "Assigned Runway: None" << endl;
+        }
+
 		cout << "--- Aircraft Details ---\n";
 		aircraft.print();
+        cout << "Priority: ";
+        switch(priority)
+        {
+            case 0:
+                cout << red << "Emergency" << default_text;
+                break;
+            case 1:
+                cout << yellow << "VIP" << default_text;
+                break;
+            case 2:
+                cout << cyan << "Cargo" << default_text;
+                break;
+            case 3:
+                cout << white << "Commercial" << default_text;
+                break;
+            default:
+                cout << "Unknown";
+                break;
+        }
+        cout << endl;
+
 	}
+
+
 
 	void checkviolation() {
 		if (assignedRunwayPtr->getRunwayID() == "RWY-A") {
@@ -186,21 +226,75 @@ public:
                 AVNStatus = true;
             }
         }
+			if (currentPhase == "Holding" && speed > 600) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Holding Phase Violation: Speed " << speed << " km/h exceeds limit of 600 km/h.  Hold 1KM around airport." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Approach" && (speed > 290 || speed < 240)) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Approach Phase Violation: Speed " << speed << " km/h is outside the 240-290 km/h range." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Landing" && (speed > 240 || speed < 30)) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Landing Phase Violation: Speed " << speed << " km/h is outside the 30-240 km/h range." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Taxi" && speed > 30) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "At Gate" && speed > 10) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << endl;
+				AVNStatus = true;
+			}
+		}
+		else if (assignedRunwayPtr->getRunwayID() == "RWY-B") {
+			if (currentPhase == "At Gate" && speed > 10) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Taxi" && speed > 30) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Takeoff Roll" && (speed > 290)) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Takeoff Roll Phase Violation: Speed " << speed << " km/h exceeds limit of 290 km/h." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Climb" && (speed > 463)) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Climb Phase Violation: Speed " << speed << " km/h exceeds limit of 463 km/h." << endl;
+				AVNStatus = true;
+			}
+			else if (currentPhase == "Cruise" && (speed > 900 || speed < 800)) {
+				cout << red << "[ " << flightID << " ]" << default_text
+					<< " Cruise Phase Violation: Speed " << speed << " km/h is outside the 800-900 km/h range." << endl;
+				AVNStatus = true;
+			}
+		}
 	}
 
 	bool getAVNStatus() const { return AVNStatus; }
 	string getID() const { return flightID; }
 	string getDirection() const { return direction; }
 	string getFlightType() const { return flightType; }
-    string getPriority() const { return priority; }
-    void setPriority(const string& p) { priority = p; }
+	int getPriority() const { return priority; }
+	void setPriority(const int& p) { priority = p; }
 	Runway* getAssignedRunwayPtr() const { return assignedRunwayPtr; }
+    void setAssignedRunwayPtr(Runway* r) {assignedRunwayPtr = r;}
 	string getCurrentPhase() const { return currentPhase; }
-    void setCurrentPhase(const string& phase) { currentPhase = phase; }
-    int getSpeed() const { return speed; }
-    void setSpeed(int s) { speed = s; }
-	string getScheduledTime() const{return scheduledTime;}
-    void setScheduledTime(const string& time){scheduledTime = time;}
+	void setCurrentPhase(const string& phase) { currentPhase = phase; }
+	int getSpeed() const { return speed; }
+	void setSpeed(int s) { speed = s; }
+	string getScheduledTime() const { return scheduledTime; }
+	void setScheduledTime(const string& time) { scheduledTime = time; }
 };
 
 class Airline {
@@ -235,12 +329,12 @@ public:
 	vector<Flight*> getFlights() {
 		return flights;
 	}
-	string getName() const{
+	string getName() const {
 		return name;
 	}
 };
 
-void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex){	
+void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex) {
 	f->setCurrentPhase(phase);
 	f->setSpeed(randomspeed); // Example speed
 	f->checkviolation();
@@ -252,19 +346,20 @@ void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mu
 	pthread_mutex_unlock(&print_mutex);
 }
 
-void* handleFlight(void* arg){
-	Flight* f = (Flight*) arg;
+void* handleFlight(void* arg) {
+	Flight* f = (Flight*)arg;
 	Runway* runway = f->getAssignedRunwayPtr();
 
 	pthread_mutex_t* mutex = nullptr;
 
-	if(runway->getRunwayID() == "RWY-A"){
+	// Check which mutex to lock based on runway id
+	if (runway->getRunwayID() == "RWY-A") {
 		mutex = &mutexA;
 	}
-	else if(runway->getRunwayID() == "RWY-B"){
+	else if (runway->getRunwayID() == "RWY-B") {
 		mutex = &mutexB;
 	}
-	else if(runway->getRunwayID() == "RWY-C"){
+	else if (runway->getRunwayID() == "RWY-C") {
 		mutex = &mutexC;
 	}
 
@@ -273,12 +368,42 @@ void* handleFlight(void* arg){
 
 	cout << yellow << "[ " << f->getID() << " ] Requesting runway " << runway->getRunwayID() << default_text << "\n";
 
+	cout << "[ " << f->getID() << " ] Requesting runway " << runway->getRunwayID() << "\n";
+
+    switch (f->getPriority())
+    {
+    case 0:
+        cout << red << "Emergency Priority!" << default_text;
+        break;
+    case 1:
+        cout << yellow << "VIP Priority" << default_text;
+        break;
+    case 2:
+        cout << cyan << "Cargo Flight" << default_text;
+        break;
+    default:
+        break;
+    }
+    cout << endl;
+
+	// sleep(1);
+	pthread_mutex_lock(mutex); // arrived flight locks the runway and other flights wait until the first one unlocks
+
 	if(!runway->isOccupied()){
 		cout << green << "[ " << f->getID() << " ] Runway assigned.\n" << default_text;
 		runway->setOccupied(true);
+	if (!runway->isOccupied()) {
+
+		cout << "[ " << f->getID() << " ] Runway " << runway->getRunwayID() << " assigned.\n";
+		runway->setOccupied(true);
 	}
 
+	
+	// sleep(1);
+
 	int randspeed;
+
+
 	if (f->getDirection() == "North" || f->getDirection() == "South") {
 		sleep(1);
 		randspeed = rand() % 500 + 100;
@@ -298,6 +423,8 @@ void* handleFlight(void* arg){
 		pthread_mutex_unlock(mutex);
 		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
 		
+
+
 		sleep(1);
 		randspeed = rand() % 20;
 		simulatePhase("Taxi", f, randspeed, mutex);
@@ -305,8 +432,8 @@ void* handleFlight(void* arg){
 		sleep(1);
 		randspeed = rand() % 2;
 		simulatePhase("At Gate", f, randspeed, mutex);
-    }
-    else if (f->getDirection() == "East" || f->getDirection() == "West"){
+	}
+	else if (f->getDirection() == "East" || f->getDirection() == "West") {
 		sleep(1);
 		randspeed = 0;
 		simulatePhase("At Gate", f, randspeed, mutex);
@@ -325,6 +452,7 @@ void* handleFlight(void* arg){
 		pthread_mutex_unlock(mutex);
 		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
 
+
 		sleep(1);
 		randspeed = rand() % 250 + 200;
 		simulatePhase("Climb", f, randspeed, mutex);
@@ -332,8 +460,8 @@ void* handleFlight(void* arg){
 		sleep(1);
 		randspeed = rand() % 300 + 600;
 		simulatePhase("Departure", f, randspeed, mutex);
-    }
-	else{ //  Runway C
+	}
+	else { //  Runway C
 		sleep(1);
 		randspeed = 0;
 		simulatePhase("At Gate", f, randspeed, mutex);
@@ -363,15 +491,15 @@ void* handleFlight(void* arg){
 	// pthread_mutex_lock(mutex);
 	// runway->setOccupied(false);
 
-	// // if(runway->getRunwayID() == "RWY-A"){
-	// // 	cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
-	// // }
-	// // else if(runway->getRunwayID() == "RWY-B"){
-	// // 	cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
-	// // }
-	// // else if(runway->getRunwayID() == "RWY-C"){
-	// // 	cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
-	// // }
+	if(runway->getRunwayID() == "RWY-A"){
+		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
+	}
+	else if(runway->getRunwayID() == "RWY-B"){
+		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
+	}
+	else if(runway->getRunwayID() == "RWY-C"){
+		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
+	}
 
 	// pthread_mutex_unlock(mutex);
 	pthread_exit(NULL);
@@ -383,8 +511,30 @@ private:
 	Runway rwyB;
 	Runway rwyC;
 	vector<Airline> airlines;
-	queue<Flight*> arrivalQueue;
-	queue<Flight*> departureQueue;
+
+	//queue<Flight*> arrivalQueue;
+	//queue<Flight*> departureQueue;
+
+    // Replaced these two with the above
+    struct FlightComparator
+    {
+        bool operator()(Flight* a, Flight* b) const
+        {
+            //Higher Priority will come first
+            if(a->getPriority() != b->getPriority())
+            {
+                return a->getPriority() < b->getPriority();
+            }
+
+            //If they have the same priortity, FCFS
+            return a->getScheduledTime() < b->getScheduledTime();
+        }
+    };
+
+    priority_queue<Flight*, vector<Flight*>, FlightComparator> arrivalQueue;
+    priority_queue<Flight*, vector<Flight*>, FlightComparator> departureQueue;
+
+
 	vector<pthread_t> flightThreads;
 	vector<Flight*> allFlights;
 public:
@@ -395,24 +545,34 @@ public:
 		pthread_mutex_init(&mutexC, NULL);
 		pthread_mutex_init(&print_mutex, NULL);
 	}
-	void initializeSystem(){
+
+    ~AirTrafficControl() {
+        // Clean up mutexes
+        pthread_mutex_destroy(&mutexA);
+        pthread_mutex_destroy(&mutexB);
+        pthread_mutex_destroy(&mutexC);
+        pthread_mutex_destroy(&print_mutex);
+        
+        // No need to delete flight pointers as we're using shared_ptr
+    }
+	void initializeSystem() {
 		// Initialize Airlines
 		Airline pia("PIA", "Commercial", rand() % 4 + 1, 0);
 		Airline fedex("FedEx", "Cargo", rand() % 3 + 1, 0);
 		// Airline emirates("Emirates", "Commercial", 2, 0);
-		
+
 		// PIA aircrafts
 		vector<Aircraft> aircraftsPia = {
 			{"AC-001", "Boeing 777", 300},
 			{"AC-002", "Airbus A320", 180}
 		};
-	
+
 		// Fedex aircrafts
 		vector<Aircraft> aircraftsFedex = {
 			{"AC-101", "Boeing 747", 400},
 			{"AC-102", "Cessna 208", 12}
 		};
-	
+
 		// PIA Flights
 		vector<Flight*> piaFlights = {
 			new Flight("PK-123", "Passenger", "North", 400, "Holding", &rwyA, aircraftsPia[0]),
@@ -420,10 +580,11 @@ public:
 			new Flight("PK-234", "Passenger", "North", 400, "Holding", &rwyA, aircraftsPia[0]),
 			new Flight("PK-456", "Passenger", "East", 0, "At Gate", &rwyB, aircraftsPia[1])
 		};
-	
+
 		for (Flight* f : piaFlights) {
 			pia.addFlight(f);
-	
+            allFlights.push_back(f); //ok lol
+
 			if (f->getDirection() == "North" || f->getDirection() == "South") {
 				arrivalQueue.push(f);
 			}
@@ -431,16 +592,17 @@ public:
 				departureQueue.push(f);
 			}
 		}
-	
+
 		// Fedex Flights
 		vector<Flight*> fedexFlights = {
 			new Flight("FX-789", "Cargo", "South", 400, "Holding", &rwyC, aircraftsFedex[0]),
 			new Flight("FX-321", "Cargo", "West", 0, "At Gate", &rwyC, aircraftsFedex[1])
 		};
-	
+
 		for (Flight* f : fedexFlights) {
 			fedex.addFlight(f);
-	
+            allFlights.push_back(f); //ok lol
+
 			if (f->getDirection() == "North" || f->getDirection() == "South") {
 				arrivalQueue.push(f);
 			}
@@ -448,81 +610,153 @@ public:
 				departureQueue.push(f);
 			}
 		}
-	
+
 		airlines.push_back(pia);
 		airlines.push_back(fedex);
 	}
 
 	void addFlight(const string& airlineName, const string& flightType, const string& direction, const string& scheduledTime) {
-        // Find the airline.  Assume PIA if not found.
-        Airline* airlinePtr = nullptr;
-        for (auto& airline : airlines) {
-            if (airline.getName() == airlineName) {
-                airlinePtr = &airline;
-                break;
-            }
-        }
-	
-        Aircraft newAircraft("AC-999", "Generic Aircraft", 200);
+		// Find the airline.  Assume PIA if not found.
+		Airline* airlinePtr = nullptr;
+		for (auto& airline : airlines) {
+			if (airline.getName() == airlineName) {
+				airlinePtr = &airline;
+				break;
+			}
+		}
 
-        // Determine the runway.
-        Runway* runwayPtr = nullptr;
-		
-        if (direction == "North" || direction == "South") {
-            runwayPtr = &rwyA;
-        } else if (direction == "East" || direction == "West") {
-            runwayPtr = &rwyB;
-        } else {
-            runwayPtr = &rwyC; // Default to RWY-C
+        if (!airlinePtr && !airlines.empty()) 
+        {
+            airlinePtr = &airlines[0];
+            cout << yellow << "Warning: Airline " << airlineName << " not found. Using " 
+                 << airlinePtr->getName() << " instead." << default_text << endl;
+        } else if (!airlinePtr) 
+        {
+            cout << red << "Error: No airlines available to add flight to." << default_text << endl;
+            return;
         }
 
         // Generate a unique flight ID.
-        string newFlightId = airlinePtr->getName().substr(0, 2) + "-" + to_string(rand() % 10000);
+		string newFlightId = airlinePtr->getName().substr(0, 2) + "-" + to_string(rand() % 10000);
 
-        // Create the new flight.
-        Flight* newFlight = new Flight(newFlightId, flightType, direction, 0, "At Gate", runwayPtr, newAircraft);
-        newFlight->setScheduledTime(scheduledTime);
-        if (newFlight->getDirection() == "North" || newFlight->getDirection() == "South") {
-                arrivalQueue.push(newFlight);
+        Aircraft newAircraft("AC-" + to_string(rand() % 1000), "Generic Aircraft", 200);
+
+		// Determine the runway.
+		/*Runway* runwayPtr = nullptr;
+
+		if (direction == "North" || direction == "South") {
+			runwayPtr = &rwyA;
+		}
+		else if (direction == "East" || direction == "West") {
+			runwayPtr = &rwyB;
+		}
+		else {
+			runwayPtr = &rwyC; // Default to RWY-C
+		}*/
+
+
+
+		// Create the new flight.
+		Flight* newFlight = new Flight(newFlightId, flightType, direction, 0, "At Gate", nullptr, newAircraft);
+		newFlight->setScheduledTime(scheduledTime);
+
+        cout << "\n\n\nI just wanna see the scheduledTime: " << scheduledTime << "\n\n\n";
+
+        Runway* runwayPtr = allocateRunway(newFlight);
+        if (!runwayPtr) 
+        {
+            cout << red << "Error: Could not allocate runway for flight " << newFlightId << default_text << endl;
+            return;
+        }
+
+        newFlight->setAssignedRunwayPtr(runwayPtr);
+
+		if (newFlight->getDirection() == "North" || newFlight->getDirection() == "South") {
+			arrivalQueue.push(newFlight);
+		}
+		else if (newFlight->getDirection() == "East" || newFlight->getDirection() == "West") {
+			departureQueue.push(newFlight);
+		}
+		airlinePtr->addFlight(newFlight);
+		allFlights.push_back(newFlight);
+
+        cout << green << "Added new flight " << newFlightId << " scheduled for " << scheduledTime << default_text << endl;
+
+	}
+
+	Flight* getFlightById(const string& id) {
+		for (Flight* flight : allFlights) {
+			if (flight->getID() == id) {
+				return flight;
+			}
+		}
+		return nullptr;
+	}
+
+	Runway* getRunwayById(const string& id) {
+		if (id == "RWY-A") {
+			return &rwyA;
+		}
+		else if (id == "RWY-B") {
+			return &rwyB;
+		}
+		else if (id == "RWY-C") {
+			return &rwyC;
+		}
+		else {
+			return nullptr;
+		}
+	}
+	priority_queue<Flight*, vector<Flight*>, FlightComparator> getArrivalQueue() {
+		return arrivalQueue;
+	}
+
+	priority_queue<Flight*, vector<Flight*>, FlightComparator> getDepartureQueue() {
+		return departureQueue;
+	}
+
+    void printPriorityQueue(priority_queue<Flight*, vector<Flight*>, FlightComparator> pq) {
+        // We need to copy the queue since pop() modifies it
+        auto queueCopy = pq;
+        int position = 1;
+        
+        while (!queueCopy.empty()) {
+            Flight* flight = queueCopy.top();
+            queueCopy.pop();
+            
+            // Print position, ID, priority type, and scheduled time
+            cout << position << ". Flight " << flight->getID() 
+                 << " (";
+            
+            // Convert priority number to text
+            switch (flight->getPriority()) {
+                case 0: cout << red << "EMERGENCY" << default_text; break;
+                case 1: cout << yellow << "VIP" << default_text; break;
+                case 2: cout << cyan << "Cargo" << default_text; break;
+                case 3: cout << white << "Commercial" << default_text; break;
+                default: cout << "Unknown";
             }
-            else if (newFlight->getDirection() == "East" || newFlight->getDirection() == "West") {
-                departureQueue.push(newFlight);
-            }
-        airlinePtr->addFlight(newFlight);
-        allFlights.push_back(newFlight);
+            
+            cout << ") - Scheduled: " << flight->getScheduledTime() 
+                 << " - Direction: " << flight->getDirection() << endl;
+            
+            position++;
+        }
+        
+        if (position == 1) {
+            cout << "  Queue is empty" << endl;
+        }
     }
 
-    Flight* getFlightById(const string& id) {
-        for (Flight* flight : allFlights) {
-            if (flight->getID() == id) {
-                return flight;
-            }
-        }
-        return nullptr;
+    void testPriorityQueues() 
+    {
+        cout << "--- Current Arrival Queue Order ---" << endl;
+        printPriorityQueue(arrivalQueue);
+        
+        cout << "\n--- Current Departure Queue Order ---" << endl;
+        printPriorityQueue(departureQueue);
     }
 
-    Runway* getRunwayById(const string& id){
-        if(id == "RWY-A"){
-            return &rwyA;
-        }
-        else if (id == "RWY-B"){
-            return &rwyB;
-        }
-        else if (id == "RWY-C"){
-            return &rwyC;
-        }
-        else{
-            return nullptr;
-        }
-    }
-    queue<Flight*> getArrivalQueue() {
-        return arrivalQueue;
-    }
-
-    queue<Flight*> getDepartureQueue() {
-        return departureQueue;
-    }
-	
 	void simulateFlights() {
 		cout << "=== FLIGHT SIMULATION WITH THREADS AND MUTEXES ===" << endl;
 		// cout << "--- Airline Info ---\n";
@@ -536,6 +770,26 @@ public:
 		// rwyB.print();
 		// rwyC.print();
 		// sleep(3);
+
+        int emergencycount = rand() % 2 + 1;
+        for(int i = 0; i < emergencycount; i++)
+        {
+            if(!allFlights.empty())
+            {
+                int index = rand() % allFlights.size();
+                Flight* emergencyflight = allFlights[index];
+
+                if(emergencyflight->getPriority() != 0)
+                {
+                    declareEmergency(emergencyflight);
+                }
+            }
+        }
+
+        cout << yellow << "\nQueues before simulation:" << default_text << endl;
+        testPriorityQueues();
+        cout << endl;
+
 		for (Airline& airline : airlines) {
 			for (Flight* f : airline.getFlights()) {
 				pthread_t tid;
@@ -543,24 +797,114 @@ public:
 				flightThreads.push_back(tid);
 			}
 		}
-	
+
 		// After launching all threads:
 		for (auto& tid : flightThreads) {
 			pthread_join(tid, NULL); // Wait for each flight to complete
 		}
 	}
+
+    bool isEmergency(Flight* flight)
+    {
+        return flight->getPriority() == 0; //Emergency Priority
+    }
+
+    Runway* getPrimaryRunway(Flight* flight)
+    {
+        if(flight->getDirection() == "North" || flight->getDirection() == "South")
+        {
+            return &rwyA;
+        }
+        else
+        {
+            return &rwyB;
+        }
+    }
+
+    Runway* allocateRunway(Flight* flight)
+    {
+        if(flight->getFlightType() == "Cargo")
+        {
+            return &rwyC;
+        }
+
+        if(isEmergency(flight))
+        {
+            Runway* primary = getPrimaryRunway(flight);
+            if(!primary->isOccupied())
+            {
+                return primary;
+            }
+
+            if(!rwyC.isOccupied())
+            {
+                return &rwyC;
+            }
+        }
+
+        if(flight->getDirection() == "North" || flight->getDirection() == "South")
+        {
+            return &rwyA;
+        }
+        else
+        {
+            return &rwyB;
+        }
+    }
+
+    void declareEmergency(Flight* flight)
+    {
+        int oldPriority = flight->getPriority();
+        flight->setPriority(0); // Emergency
+
+        if(oldPriority != 0)
+        {
+            cout << red << "[" << flight->getID() << "]" << default_text << "Emergency Declared! Re-ordering Queues..." << endl;
+
+            vector<Flight*> tempflights;
+            while(!arrivalQueue.empty())
+            {
+                tempflights.push_back(arrivalQueue.top());
+                arrivalQueue.pop();
+            }
+
+            for(auto f : tempflights)
+            {
+                arrivalQueue.push(f);
+            }
+
+            tempflights.clear();
+            while(!departureQueue.empty())
+            {
+                tempflights.push_back(departureQueue.top());
+                departureQueue.pop();
+            }
+            for(auto f : tempflights)
+            {
+                departureQueue.push(f);
+            }
+
+            Runway* emergencyrunway = allocateRunway(flight);
+            {
+                if(!emergencyrunway->isOccupied())
+                {
+                    cout << green << "[" << flight->getID() << "]" << default_text << "Emergency flight assigned to " << emergencyrunway->getRunwayID() << endl;
+                }
+            }
+        }
+    }
 };
 
 int main() {
 	srand(time(0));
 	ATC atc;
 	atc.initializeSystem();
-	
+
 	// atc.addFlight("PIA", "Passenger", "North", "12:00");
 	// atc.addFlight("FedEx", "Cargo", "West", "13:00");
 	// // atc.addFlight("AirBlue", "Passenger", "South", "14:00");
 	// atc.addFlight("PIA", "Passenger", "East", "15:00");
-	
+
 	atc.simulateFlights();
 	return 0;
 }
