@@ -37,7 +37,7 @@ public:
 	vector<Flight*> getFlights() {
 		return flights;
 	}
-	string getName() const{
+	string getName() const {
 		return name;
 	}
 };

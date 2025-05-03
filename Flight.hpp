@@ -11,9 +11,9 @@ using namespace sf;
 
 class Flight {
 	// New data members
-	string priority;
+    int priority; // 0 is Emergency, 1 is VIP, 2 is Cargo, 3 is Commercial
 	string scheduledTime;
-	
+
 	string flightID;
 	string flightType;
 	string direction;
@@ -23,26 +23,44 @@ class Flight {
 	Runway* assignedRunwayPtr;
 	Aircraft aircraft;
 
+    // SFML
     Sprite sprite;
-	Texture* texture;
+    Texture texture;
     IntRect* textureRect;
 
+    
 public:
-	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr) {}
+	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr), priority(3) {}
 
 	Flight(string flightID, string flightType, string direction, int speed,
 		string currentPhase, Runway* runwayPtr, Aircraft aircraft)
 		: flightID(flightID), flightType(flightType), direction(direction),
 		speed(speed), currentPhase(currentPhase), assignedRunwayPtr(runwayPtr),
-		AVNStatus(false), aircraft(aircraft) {
-            textureRect = new IntRect(0, 0, 128, 160);
-            texture = new Texture;
-            texture->loadFromFile("plane.png");
-            // sprite.rotate(90.0f);
-            sprite.setTexture(*texture);
+		AVNStatus(false), aircraft(aircraft)
+        {
+            texture.loadFromFile("plane.png");
+            if(flightType == "Passenger")
+            {
+                priority = 3;
+                textureRect = new IntRect(0, 0, 128, 170);
+            }
+            else if(flightType == "Cargo")
+            {
+                priority = 2;
+                textureRect = new IntRect(128, 0, 156, 170);
+            }
+            sprite.setTexture(texture);
             sprite.setTextureRect(*textureRect);
-            sprite.setScale(1, 1);
+
         }
+    
+    Sprite& getSprite(){
+        return sprite;
+    }
+
+    void setSpritePos(int x, int y){
+        sprite.setPosition(x, y);
+    }
 
 	void print() const {
 		cout << "\033[1;36m" << "--- Flight " << flightID << " Status ---" << "\033[0m" << endl;
@@ -53,16 +71,41 @@ public:
 		cout << "Current Phase: " << currentPhase << endl;
 		// cout << "Operation Type: " << (isArrival ? "Arrival" : "Departure") << endl;
 		cout << "AVN Status: " << (AVNStatus ? "\033[1;31mActive\033[0m" : "\033[1;32mInactive\033[0m") << endl;
-		cout << "Assigned Runway: " << assignedRunwayPtr->getRunwayID() << endl;
+        if (assignedRunwayPtr) 
+        {
+            cout << "Assigned Runway: " << assignedRunwayPtr->getRunwayID() << endl;
+        } else 
+        {
+            cout << "Assigned Runway: None" << endl;
+        }
+
 		cout << "--- Aircraft Details ---\n";
 		aircraft.print();
+        cout << "Priority: ";
+        switch(priority)
+        {
+            case 0:
+                cout << red << "Emergency" << default_text;
+                break;
+            case 1:
+                cout << yellow << "VIP" << default_text;
+                break;
+            case 2:
+                cout << cyan << "Cargo" << default_text;
+                break;
+            case 3:
+                cout << white << "Commercial" << default_text;
+                break;
+            default:
+                cout << "Unknown";
+                break;
+        }
+        cout << endl;
+
 	}
-    void draw(RenderWindow& window) {
-        window.draw(sprite);
-    }
-    void setPosition(int x, int y){
-        sprite.setPosition(x, y);
-    }
+
+
+
 	void checkviolation() {
 		if (assignedRunwayPtr->getRunwayID() == "RWY-A") {
             if (currentPhase == "Holding" && speed > 600) {
@@ -124,13 +167,14 @@ public:
 	string getID() const { return flightID; }
 	string getDirection() const { return direction; }
 	string getFlightType() const { return flightType; }
-    string getPriority() const { return priority; }
-    void setPriority(const string& p) { priority = p; }
+	int getPriority() const { return priority; }
+	void setPriority(const int& p) { priority = p; }
 	Runway* getAssignedRunwayPtr() const { return assignedRunwayPtr; }
+    void setAssignedRunwayPtr(Runway* r) {assignedRunwayPtr = r;}
 	string getCurrentPhase() const { return currentPhase; }
-    void setCurrentPhase(const string& phase) { currentPhase = phase; }
-    int getSpeed() const { return speed; }
-    void setSpeed(int s) { speed = s; }
-	string getScheduledTime() const{return scheduledTime;}
-    void setScheduledTime(const string& time){scheduledTime = time;}
+	void setCurrentPhase(const string& phase) { currentPhase = phase; }
+	int getSpeed() const { return speed; }
+	void setSpeed(int s) { speed = s; }
+	string getScheduledTime() const { return scheduledTime; }
+	void setScheduledTime(const string& time) { scheduledTime = time; }
 };
