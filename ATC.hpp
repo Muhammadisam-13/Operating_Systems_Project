@@ -263,25 +263,36 @@ class ATC {
 			pthread_mutex_init(&print_mutex, NULL);
 		}
 	
-		void run()
-		{
+		void run() {
 			window.setFramerateLimit(60);
-	
-		    while (window.isOpen()) {
-		        Event event;
-		        while (window.pollEvent(event)) {
-		            if (event.type == Event::Closed)
-		                window.close();
-		        }
-	
-		        window.clear();
-		        window.draw(sprite);
-				if (!allFlights.empty() && allFlights[0] != nullptr) 
-				{
-					window.draw(allFlights[0]->getSprite());
+		
+			while (window.isOpen()) {
+				Event event;
+				while (window.pollEvent(event)) {
+					if (event.type == Event::Closed)
+						window.close();
 				}
-		        window.display();
-		    }
+		
+				window.clear();
+				window.draw(sprite);
+				
+				// Add safety checks and logging
+				if (!allFlights.empty()) {
+					if (allFlights[0] != nullptr) {
+						try {
+							window.draw(allFlights[0]->getSprite());
+						} catch (const std::exception& e) {
+							cout << "Exception when drawing sprite: " << e.what() << endl;
+						}
+					} else {
+						cout << "Flight pointer is null!" << endl;
+					}
+				} else {
+					cout << "allFlights vector is empty!" << endl;
+				}
+				
+				window.display();
+			}
 		}
 	
 		//added this
@@ -678,6 +689,10 @@ class ATC {
 	
 			airlines.push_back(pia);
 			airlines.push_back(fedex);
+			airlines.push_back(airblue);
+			airlines.push_back(pakairforce);
+			airlines.push_back(bluedart);
+			airlines.push_back(aghakhan);
 		}
 	
 		void addFlight(const string& airlineName, const string& flightType, const string& direction, const string& scheduledTime) {

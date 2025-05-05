@@ -38,25 +38,54 @@ public:
 		speed(speed), currentPhase(currentPhase), assignedRunwayPtr(runwayPtr),
 		AVNStatus(false), aircraft(aircraft)
         {
-            texture.loadFromFile("plane.png");
+            textureRect = new IntRect(); 
             if(flightType == "Passenger")
             {
                 priority = 3;
-                textureRect = new IntRect(0, 0, 128, 170);
+                texture.loadFromFile("plane.png");
+                *textureRect = IntRect(0, 0, 128, 170);
             }
             else if(flightType == "Cargo")
             {
                 priority = 2;
-                textureRect = new IntRect(128, 0, 156, 170);
+                texture.loadFromFile("plane.png");
+                *textureRect = IntRect(128, 0, 156, 170);
+            }
+            else if (flightType == "Military") 
+            {
+                priority = 1;
+                texture.loadFromFile("militarysprite.png");
+                *textureRect = IntRect(0, 0, 160, 80); // Adjust these values
+            }
+            else if (flightType == "Medical") 
+            {
+                priority = 0;
+                texture.loadFromFile("militarysprite.png");
+                *textureRect = IntRect(0, 170, 100, 80); // Adjust these values
             }
             sprite.setTexture(texture);
             sprite.setTextureRect(*textureRect);
 
         }
+
+        ~Flight() {
+            delete textureRect;
+        }
     
-    Sprite& getSprite(){
-        return sprite;
-    }
+        bool loadSprite(string& filename) {
+            if (!texture.loadFromFile(filename)) 
+            {
+                return false;
+            }
+            sprite.setTexture(texture);
+            return true;
+        }
+        
+        // Make sure getSprite() is implemented correctly
+        Sprite& getSprite() 
+        {
+            return sprite;
+        }
 
     void setSpritePos(int x, int y){
         sprite.setPosition(x, y);
