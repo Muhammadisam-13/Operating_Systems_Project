@@ -23,7 +23,8 @@ int main(){
     // Current time as string
 
     // Start the simulation
-    atc.simulateFlights();
+    //atc.simulateFlights();
+
     atc.run();
 
 	return 0;

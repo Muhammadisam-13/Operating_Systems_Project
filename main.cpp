@@ -554,30 +554,6 @@ public:
         int arrivalWaitTime = 0;
         int departureWaitTime = 0;
 
-        // Process arrivals
-        // while (!arrivalQueueCopy.empty()) {
-        //     Flight* flight = arrivalQueueCopy.top();
-        //     arrivalQueueCopy.pop();
-
-        //     // Store the estimated wait time for this flight
-        //     estimatedWaitTimes[flight->getID()] = arrivalWaitTime;
-
-        //     // Each flight takes approximately 1 minute to process
-        //     arrivalWaitTime += 60;
-        // }
-
-        // // Process departures
-        // while (!departureQueueCopy.empty()) {
-        //     Flight* flight = departureQueueCopy.top();
-        //     departureQueueCopy.pop();
-
-        //     // Store the estimated wait time for this flight
-        //     estimatedWaitTimes[flight->getID()] = departureWaitTime;
-
-        //     // Each flight takes approximately 1 minute to process
-        //     departureWaitTime += 60;
-        // }
-
         // Process arrivals - more sophisticated model
 	    while (!arrivalQueueCopy.empty()) 
         {

@@ -263,19 +263,6 @@ class ATC {
 			pthread_mutex_init(&print_mutex, NULL);
 		}
 	
-		~ATC() {
-			// Clean up mutexes
-			pthread_mutex_destroy(&mutexA);
-			pthread_mutex_destroy(&mutexB);
-			pthread_mutex_destroy(&mutexC);
-			pthread_mutex_destroy(&print_mutex);
-			
-			//added this
-			for (Flight* flight : allFlights) {
-				delete flight;
-			}
-		}
-	
 		void run()
 		{
 			window.setFramerateLimit(60);
@@ -289,7 +276,10 @@ class ATC {
 	
 		        window.clear();
 		        window.draw(sprite);
-				window.draw(allFlights[0]->getSprite());
+				if (!allFlights.empty() && allFlights[0] != nullptr) 
+				{
+					window.draw(allFlights[0]->getSprite());
+				}
 		        window.display();
 		    }
 		}
