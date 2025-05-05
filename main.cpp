@@ -489,11 +489,11 @@ private:
             //Higher Priority will come first
             if(a->getPriority() != b->getPriority())
             {
-                return a->getPriority() < b->getPriority();
+                return a->getPriority() > b->getPriority();
             }
 
             //If they have the same priortity, FCFS
-            return a->getScheduledTime() < b->getScheduledTime();
+            return a->getScheduledTime() > b->getScheduledTime();
         }
     };
 
@@ -528,6 +528,23 @@ public:
         }
     }
 
+    // void run(){
+	// 	window.setFramerateLimit(60);
+
+    //     while (window.isOpen()) {
+    //         Event event;
+    //         while (window.pollEvent(event)) {
+    //             if (event.type == Event::Closed)
+    //                 window.close();
+    //         }
+
+    //         window.clear();
+    //         window.draw(sprite);
+	// 		window.draw(allFlights[0]->getSprite());
+    //         window.display();
+    //     }
+	// }
+
     //added this
     void updateEstimatedWaitTimes() {
         // Make a copy of the queues to avoid modifying them
@@ -538,28 +555,103 @@ public:
         int departureWaitTime = 0;
 
         // Process arrivals
-        while (!arrivalQueueCopy.empty()) {
+        // while (!arrivalQueueCopy.empty()) {
+        //     Flight* flight = arrivalQueueCopy.top();
+        //     arrivalQueueCopy.pop();
+
+        //     // Store the estimated wait time for this flight
+        //     estimatedWaitTimes[flight->getID()] = arrivalWaitTime;
+
+        //     // Each flight takes approximately 1 minute to process
+        //     arrivalWaitTime += 60;
+        // }
+
+        // // Process departures
+        // while (!departureQueueCopy.empty()) {
+        //     Flight* flight = departureQueueCopy.top();
+        //     departureQueueCopy.pop();
+
+        //     // Store the estimated wait time for this flight
+        //     estimatedWaitTimes[flight->getID()] = departureWaitTime;
+
+        //     // Each flight takes approximately 1 minute to process
+        //     departureWaitTime += 60;
+        // }
+
+        // Process arrivals - more sophisticated model
+	    while (!arrivalQueueCopy.empty()) 
+        {
             Flight* flight = arrivalQueueCopy.top();
             arrivalQueueCopy.pop();
-
+    
+            // Base processing time based on flight type
+            int processingTime = 60; // Default 1 minute
+    
+            // Adjust for flight type
+            if (flight->getFlightType() == "Cargo") 
+            {
+            processingTime += 20; // Cargo takes longer
+            } 
+            else if (flight->getFlightType() == "Medical") 
+            {
+            processingTime -= 20; // Medical gets expedited (minimum 40 seconds)
+            }
+    
+            // Adjust for runway congestion
+            if (rwyA.isOccupied() && (flight->getDirection() == "North" || flight->getDirection() == "South")) 
+            {
+            processingTime += 30; // Add delay if preferred runway is occupied
+            }
+    
             // Store the estimated wait time for this flight
             estimatedWaitTimes[flight->getID()] = arrivalWaitTime;
-
-            // Each flight takes approximately 1 minute to process
-            arrivalWaitTime += 60;
+    
+            // Each flight adds to the cumulative wait time
+            arrivalWaitTime += processingTime;
         }
 
-        // Process departures
-        while (!departureQueueCopy.empty()) {
+        while (!departureQueueCopy.empty()) 
+        {
             Flight* flight = departureQueueCopy.top();
             departureQueueCopy.pop();
-
+    
+            int processingTime = 50; // Default departure time
+    
+            if (flight->getFlightType() == "Cargo") 
+            {
+                processingTime += 30; // Cargo loading takes longer
+            } 
+            else if (flight->getFlightType() == "Military") 
+            {
+                processingTime -= 15; // Military gets expedited
+            }
+    
+            // Adjust for runway congestion
+            if (rwyB.isOccupied() && (flight->getDirection() == "East" || flight->getDirection() == "West")) 
+            {
+                processingTime += 40; // Add delay if preferred runway is occupied
+            }
+    
             // Store the estimated wait time for this flight
             estimatedWaitTimes[flight->getID()] = departureWaitTime;
-
-            // Each flight takes approximately 1 minute to process
-            departureWaitTime += 60;
+    
+            // Each flight adds to the cumulative wait time
+            departureWaitTime += processingTime;
         }
+
+    }
+
+    std::string getFormattedWaitTime(const std::string& flightId) 
+    {
+        int seconds = getEstimatedWaitTime(flightId);
+        if (seconds < 0) {
+            return "Unknown";
+        }
+    
+        int minutes = seconds / 60;
+        seconds %= 60;
+    
+        return std::to_string(minutes) + "m " + std::to_string(seconds) + "s";
     }
 
     int getEstimatedWaitTime(const string& flightId) {
@@ -570,20 +662,22 @@ public:
     }
 
     //added this
-    void displayFlightStatus() {
+    void displayFlightStatus() 
+    {
         pthread_mutex_lock(&print_mutex);
-        cout << "\n=== CURRENT FLIGHT STATUS ===" << endl;
+        cout << "\n" << cyan << "======== CURRENT FLIGHT STATUS ========" << default_text << endl;
         cout << "Total Flights: " << allFlights.size() << endl;
 
+        // Track flights by phase and type
         int holding = 0, approach = 0, landing = 0, taxi = 0, atGate = 0;
         int takeoff = 0, climb = 0, departure = 0;
         int activeViolations = 0;
+        int passengerFlights = 0, cargoFlights = 0, militaryFlights = 0, medicalFlights = 0;
+        int emergencyPriority = 0, vipPriority = 0, normalPriority = 0;
 
-        for (Flight* flight : allFlights) {
-            if (flight->getAVNStatus()) {
-                activeViolations++;
-            }
-
+        for (Flight* flight : allFlights) 
+        {
+            // Count by phase
             string phase = flight->getCurrentPhase();
             if (phase == "Holding") holding++;
             else if (phase == "Approach") approach++;
@@ -593,35 +687,96 @@ public:
             else if (phase == "Takeoff Roll") takeoff++;
             else if (phase == "Climb") climb++;
             else if (phase == "Departure") departure++;
+
+            // Count by type
+            string type = flight->getFlightType();
+            if (type == "Passenger") passengerFlights++;
+            else if (type == "Cargo") cargoFlights++;
+            else if (type == "Military") militaryFlights++;
+            else if (type == "Medical") medicalFlights++;
+
+            // Count by priority
+            int priority = flight->getPriority();
+            if (priority == 0) emergencyPriority++;
+            else if (priority == 1) vipPriority++;
+            else normalPriority++;
+
+            // Count violations
+            if (flight->getAVNStatus()) 
+            {
+                activeViolations++;
+            }
         }
 
-        cout << "Flights by Phase:" << endl;
-        cout << "  Holding: " << holding << endl;
-        cout << "  Approach: " << approach << endl;
-        cout << "  Landing: " << landing << endl;
-        cout << "  Taxi: " << taxi << endl;
-        cout << "  At Gate: " << atGate << endl;
-        cout << "  Takeoff Roll: " << takeoff << endl;
-        cout << "  Climb: " << climb << endl;
-        cout << "  Departure: " << departure << endl;
+        // Display flight breakdown by phase
+        cout << "\nFlights by Phase:" << endl;
+        cout << " " << blue << "Holding: " << holding << default_text << " | "
+        << magenta << "Approach: " << approach << default_text << " | "
+        << yellow << "Landing: " << landing << default_text << " | "
+        << cyan << "Taxi: " << taxi << default_text << endl;
+        cout << " " << green << "At Gate: " << atGate << default_text << " | "
+        << red << "Takeoff: " << takeoff << default_text << " | "
+        << blue << "Climb: " << climb << default_text << " | "
+        << magenta << "Departure: " << departure << default_text << endl;
 
-        cout << "Active Violations: " << activeViolations << endl;
+        // Display flight breakdown by type
+        cout << "\nFlights by Type:" << endl;
+        cout << " " << white << "Passenger: " << passengerFlights << default_text << " | "
+        << cyan << "Cargo: " << cargoFlights << default_text << " | "
+        << yellow << "Military: " << vipPriority << default_text << " | "
+        << red << "Medical: " << medicalFlights << default_text << endl;
 
-        if (activeViolations > 0) {
+        // Display priority breakdown
+        cout << "\nPriority Levels:" << endl;
+        cout << " " << red << "Emergency: " << emergencyPriority << default_text << " | "
+        << yellow << "VIP: " << vipPriority << default_text << " | "
+        << white << "Normal: " << normalPriority << default_text << endl;
+
+        // Active violations
+        cout << "\nActive Violations: " << activeViolations << endl;
+        if (activeViolations > 0) 
+        {
             cout << "Aircraft with Violations:" << endl;
-            for (Flight* flight : allFlights) {
-                if (flight->getAVNStatus()) {
-                    cout << "  " << flight->getID() << " (" << flight->getFlightType()
-                        << ", " << flight->getCurrentPhase() << ")" << endl;
+            for (Flight* flight : allFlights) 
+            {
+                if (flight->getAVNStatus()) 
+                {
+                    cout << " " << red << flight->getID() << default_text << " ("
+                    << flight->getFlightType() << ", " << flight->getCurrentPhase() << ")" << endl;
                 }
             }
         }
 
         // Runway status
         cout << "\nRunway Status:" << endl;
-        cout << "  RWY-A: " << (rwyA.isOccupied() ? "Occupied" : "Available") << endl;
-        cout << "  RWY-B: " << (rwyB.isOccupied() ? "Occupied" : "Available") << endl;
-        cout << "  RWY-C: " << (rwyC.isOccupied() ? "Occupied" : "Available") << endl;
+        cout << " RWY-A: " << (rwyA.isOccupied() ? red + "Occupied" : green + "Available") << default_text << endl;
+        cout << " RWY-B: " << (rwyB.isOccupied() ? red + "Occupied" : green + "Available") << default_text << endl;
+        cout << " RWY-C: " << (rwyC.isOccupied() ? red + "Occupied" : green + "Available") << default_text << endl;
+
+        // Queue lengths
+        cout << "\nQueue Status:" << endl;
+        auto arrivalQueueCopy = arrivalQueue;
+        auto departureQueueCopy = departureQueue;
+        cout << " Arrival Queue: " << arrivalQueueCopy.size() << " flights waiting" << endl;
+        cout << " Departure Queue: " << departureQueueCopy.size() << " flights waiting" << endl;
+
+        // Update wait times before displaying them
+        updateEstimatedWaitTimes();
+
+        // Show next flights in each queue with estimated wait times
+        if (!arrivalQueueCopy.empty()) 
+        {
+            Flight* nextArrival = arrivalQueueCopy.top();
+            cout << "\nNext Arrival: " << nextArrival->getID()
+            << " - Est. Wait: " << getFormattedWaitTime(nextArrival->getID()) << endl;
+        }
+
+        if (!departureQueueCopy.empty()) 
+        {
+            Flight* nextDeparture = departureQueueCopy.top();
+            cout << "Next Departure: " << nextDeparture->getID()
+            << " - Est. Wait: " << getFormattedWaitTime(nextDeparture->getID()) << endl;
+        }
 
         pthread_mutex_unlock(&print_mutex);
     }
@@ -954,18 +1109,27 @@ public:
                     break;
                 }
 
-                if (elapsedSeconds % 30 == 0) { // Update every 30 seconds
+                // Update status every 15 seconds
+                if (elapsedSeconds % 15 == 0)
+                {
                     pthread_mutex_lock(&print_mutex);
                     cout << yellow << "\n=== SIMULATION TIME: " << elapsedSeconds
-                        << " seconds / " << remainingSeconds << " seconds remaining ==="
-                        << default_text << endl;
+                    << " seconds / " << remainingSeconds << " seconds remaining ==="
+                    << default_text << endl;
                     pthread_mutex_unlock(&print_mutex);
+                
+                    // Display comprehensive status
+                    atc->displayFlightStatus();
+                
+                    // Update wait times
+                    atc->updateEstimatedWaitTimes();
                 }
-
+   
                 std::this_thread::sleep_for(std::chrono::seconds(1));
-            }
-            return nullptr;
-            }, this);
+                
+                }
+        return nullptr;
+        }, this);
 
         // Generate random emergencies
         int emergencycount = rand() % 2 + 1;
@@ -1257,45 +1421,81 @@ public:
         }
     }
 
-    void declareEmergency(Flight* flight)
+    void declareEmergency(Flight* flight) 
     {
         int oldPriority = flight->getPriority();
-        flight->setPriority(0); // Emergency
-
-        if(oldPriority != 0)
+        flight->setPriority(0); // Set to Emergency priority
+       
+        if (oldPriority != 0) 
         {
-            cout << red << "[" << flight->getID() << "]" << default_text << "Emergency Declared! Re-ordering Queues..." << endl;
-
+            pthread_mutex_lock(&print_mutex);
+            cout << red << "[ " << flight->getID() << " ] !!! EMERGENCY DECLARED !!!" << default_text << endl;
+        
+            // Log the type of emergency
+            string emergencyType;
+            switch (rand() % 5) 
+            {
+            case 0: emergencyType = "Medical emergency on board"; break;
+            case 1: emergencyType = "Engine malfunction"; break;
+            case 2: emergencyType = "Hydraulic system failure"; break;
+            case 3: emergencyType = "Fuel leak"; break;
+            case 4: emergencyType = "Pressurization issue"; break;
+            }
+            cout << red << "[ " << flight->getID() << " ] Emergency type: " << emergencyType << default_text << endl;
+        
+            // Re-sort the queues to reflect the new priority
+            cout << yellow << "[ " << flight->getID() << " ] Re-ordering flight queues for emergency priority" << default_text << endl;
+            pthread_mutex_unlock(&print_mutex);
+        
+            // Re-create the arrival queue with updated priorities
             vector<Flight*> tempflights;
-            while(!arrivalQueue.empty())
+            while (!arrivalQueue.empty()) 
             {
                 tempflights.push_back(arrivalQueue.top());
                 arrivalQueue.pop();
             }
-
-            for(auto f : tempflights)
+        
+            for (auto f : tempflights) 
             {
                 arrivalQueue.push(f);
             }
-
+        
+            // Re-create the departure queue with updated priorities
             tempflights.clear();
-            while(!departureQueue.empty())
+            while (!departureQueue.empty()) 
             {
                 tempflights.push_back(departureQueue.top());
                 departureQueue.pop();
             }
-            for(auto f : tempflights)
+        
+            for (auto f : tempflights) 
             {
-                departureQueue.push(f);
+            departureQueue.push(f);
             }
-
-            Runway* emergencyrunway = allocateRunway(flight);
+        
+            // Try to allocate a runway immediately if possible
+            Runway* emergencyRunway = allocateRunway(flight);
+        
+            pthread_mutex_lock(&print_mutex);
+            if (!emergencyRunway->isOccupied()) 
             {
-                if(!emergencyrunway->isOccupied())
-                {
-                    cout << green << "[" << flight->getID() << "]" << default_text << "Emergency flight assigned to " << emergencyrunway->getRunwayID() << endl;
-                }
+                cout << green << "[ " << flight->getID() << " ] Emergency flight assigned to "
+                << emergencyRunway->getRunwayID() << " - IMMEDIATE CLEARANCE" << default_text << endl;
+            
+                // Alert emergency services
+                cout << blue << "[ SYSTEM ] Emergency services notified and on standby" << default_text << endl;
+            } 
+            else 
+            {
+                cout << yellow << "[ " << flight->getID() << " ] Waiting for "
+                << emergencyRunway->getRunwayID() << " to become available" << default_text << endl;
+            
+                // Calculate expected wait time
+                updateEstimatedWaitTimes();
+                cout << yellow << "[ " << flight->getID() << " ] Estimated wait time: "
+                << getFormattedWaitTime(flight->getID()) << default_text << endl;
             }
+            pthread_mutex_unlock(&print_mutex);
         }
     }
 
