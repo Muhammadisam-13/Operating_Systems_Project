@@ -275,21 +275,10 @@ class ATC {
 		
 				window.clear();
 				window.draw(sprite);
+				// allFlights[0]->setSpritePos(200, 500);
+				window.draw(allFlights[0]->getSprite());
+				allFlights[0]->move();
 				
-				// Add safety checks and logging
-				if (!allFlights.empty()) {
-					if (allFlights[0] != nullptr) {
-						try {
-							window.draw(allFlights[0]->getSprite());
-						} catch (const std::exception& e) {
-							cout << "Exception when drawing sprite: " << e.what() << endl;
-						}
-					} else {
-						cout << "Flight pointer is null!" << endl;
-					}
-				} else {
-					cout << "allFlights vector is empty!" << endl;
-				}
 				
 				window.display();
 			}
