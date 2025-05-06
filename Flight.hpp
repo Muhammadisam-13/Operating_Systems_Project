@@ -135,32 +135,38 @@ public:
 
 
 
-	void checkviolation() {
+	bool checkviolation() {
+        bool violationdetected = false;
 		if (assignedRunwayPtr->getRunwayID() == "RWY-A") {
             if (currentPhase == "Holding" && speed > 600) {
                 cout << red << "[ " << flightID << " ]" << default_text
                     << " Holding Phase Violation: Speed " << speed << " km/h exceeds limit of 600 km/h.  Hold 1KM around airport." << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Approach" && (speed > 290 || speed < 240)) {
                 cout << red << "[ " << flightID << " ]"
                     << " Approach Phase Violation: Speed " << speed << " km/h is outside the 240-290 km/h range." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Landing" && (speed > 240 || speed < 30)) {
                 cout << red << "[ " << flightID << " ]"
                     << " Landing Phase Violation: Speed " << speed << " km/h is outside the 30-240 km/h range." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Taxi" && speed > 30) {
                 cout << red << "[ " << flightID << " ]"
                     << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "At Gate" && speed > 10) {
                 cout << red << "[ " << flightID << " ]"
                     << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
         }
         else if (assignedRunwayPtr->getRunwayID() == "RWY-B") {
@@ -168,31 +174,39 @@ public:
                 cout << red << "[ " << flightID << " ]"
                     << " At Gate Phase Violation: Speed " << speed << " km/h exceeds limit of 10 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Taxi" && speed > 30) {
                 cout << red << "[ " << flightID << " ]"
                     << " Taxi Phase Violation: Speed " << speed << " km/h exceeds limit of 30 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Takeoff Roll" && (speed > 290)) {
                 cout << red << "[ " << flightID << " ]"
                     << " Takeoff Roll Phase Violation: Speed " << speed << " km/h exceeds limit of 290 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Climb" && (speed > 463)) {
                 cout << red << "[ " << flightID << " ]"
                     << " Climb Phase Violation: Speed " << speed << " km/h exceeds limit of 463 km/h." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
             else if (currentPhase == "Cruise" && (speed > 900 || speed < 800)) {
                 cout << red << "[ " << flightID << " ]"
                     << " Cruise Phase Violation: Speed " << speed << " km/h is outside the 800-900 km/h range." << default_text << endl;
                 AVNStatus = true;
+                violationdetected = true;
             }
         }
+
+        return violationdetected;
 	}
 
 	bool getAVNStatus() const { return AVNStatus; }
+    void setAVNStatus(bool status) {AVNStatus = status;} 
 	string getID() const { return flightID; }
 	string getDirection() const { return direction; }
 	string getFlightType() const { return flightType; }

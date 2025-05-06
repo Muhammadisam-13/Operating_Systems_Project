@@ -17,6 +17,7 @@ pthread_mutex_t mutexB;
 pthread_mutex_t mutexC;
 pthread_mutex_t print_mutex;
 
+
 void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex) {
 	f->setCurrentPhase(phase);
 	f->setSpeed(randomspeed); // Example speed
