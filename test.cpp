@@ -1,6 +1,7 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include "ATC.hpp"
+#include "AVN.hpp"
 using namespace sf;
 
 int main(){
@@ -23,9 +24,12 @@ int main(){
     // Current time as string
 
     // Start the simulation
-    //atc.simulateFlights();
+    atc.simulateFlights();
+    
+    //AVN avn("1234", "PIA", "Commercial", 345, 100, 200);
+    //avn.display();
 
-    atc.run();
+    //atc.run();
 
 	return 0;
 }

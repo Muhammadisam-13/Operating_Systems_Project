@@ -25,7 +25,8 @@ private:
     double baseAmount;
     double serviceFee;
     double totalAmount;
-    string paymentStatus;     string airlineName;
+    string paymentStatus;   
+    string airlineName;
 
     string dueDate;
 public:
@@ -80,6 +81,11 @@ public:
     string getPaymentStatus() const { return paymentStatus; }
     string getDueDate() const { return dueDate; }
     string getIssuanceDateTime() const { return issuanceDateTime; }
+    int getRecordedSpeed() const { return recordedSpeed; }
+    int getAllowedSpeedLow() const { return allowedSpeedLow; }
+    int getAllowedSpeedHigh() const { return allowedSpeedHigh; }
+    double getBaseAmount() const { return baseAmount; }
+    double getServiceFee() const { return serviceFee; }
     
     // Setters
     void setPaymentStatus(string status) { 

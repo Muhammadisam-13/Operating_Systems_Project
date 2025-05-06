@@ -5,6 +5,7 @@
 #include "Airline.hpp"
 #include <pthread.h>
 #include "Colors.hpp"
+#include "ATCSController.hpp"
 #include <chrono>
 #include <thread>
 #include <unistd.h>
@@ -16,18 +17,20 @@ pthread_mutex_t mutexA;
 pthread_mutex_t mutexB;
 pthread_mutex_t mutexC;
 pthread_mutex_t print_mutex;
+ATCSController* atcController;
 
-
-void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex) {
-	f->setCurrentPhase(phase);
-	f->setSpeed(randomspeed); // Example speed
-	f->checkviolation();
-
-	pthread_mutex_lock(&print_mutex);
-	cout << "\033[1;33m" << f->getID() << " entering " << f->getCurrentPhase() << " phase at " << f->getSpeed() << " km/h \033[0m" << endl;
-	f->print();
-	cout << endl;
-	pthread_mutex_unlock(&print_mutex);
+void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex, ATCSController* atcControllerr) 
+{
+    f->setCurrentPhase(phase);
+    f->setSpeed(randomspeed);
+    
+    pthread_mutex_lock(mutex);
+    cout << "\033[1;33m" << f->getID() << " entering " << phase << " phase at " << randomspeed << " km/h \033[0m" << endl;
+    f->print();
+    cout << endl;
+    pthread_mutex_unlock(mutex);
+    
+    atcControllerr->detectViolations(f);
 }
 
 void* handleFlight(void* arg) 
@@ -86,16 +89,16 @@ void* handleFlight(void* arg)
 	if (f->getDirection() == "North" || f->getDirection() == "South") {
 		sleep(1);
 		randspeed = rand() % 500 + 100;
-		simulatePhase("Holding", f, randspeed, mutex);
+		simulatePhase("Holding", f, randspeed, mutex, atcController);
 
 		sleep(1);
 		randspeed = rand() % 260 + 40;
-		simulatePhase("Approach", f, randspeed, mutex);
+		simulatePhase("Approach", f, randspeed, mutex, atcController);
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 200;
-		simulatePhase("Landing", f, randspeed, mutex);
+		simulatePhase("Landing", f, randspeed, mutex, atcController);
 
 		// unlock runway 
 		runway->setOccupied(false);
@@ -106,13 +109,13 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 20;
-		simulatePhase("Taxi", f, randspeed, mutex);
+		simulatePhase("Taxi", f, randspeed, mutex, atcController);
 
         //if (!checkGroundFaults(f)) 
         //{
             sleep(1);
             randspeed = rand() % 2;
-            simulatePhase("At Gate", f, randspeed, mutex);
+            simulatePhase("At Gate", f, randspeed, mutex, atcController);
 
             // Check for ground faults at gate
             //checkGroundFaults(f);
@@ -121,19 +124,19 @@ void* handleFlight(void* arg)
 	else if (f->getDirection() == "East" || f->getDirection() == "West") {
 		sleep(1);
 		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex);
+		simulatePhase("At Gate", f, randspeed, mutex, atcController);
         
         //if (!checkGroundFaults(f))
         //{
             sleep(1);
             randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex);
+            simulatePhase("Taxi", f, randspeed, mutex, atcController);
         //}
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex);
+		simulatePhase("Takeoff Roll", f, randspeed, mutex, atcController);
 
 		// unlock runway 
 		runway->setOccupied(false);
@@ -143,28 +146,28 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex);
+		simulatePhase("Climb", f, randspeed, mutex, atcController);
 
 		sleep(1);
 		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex);
+		simulatePhase("Departure", f, randspeed, mutex, atcController);
 	}
 	else { //  Runway C
 		sleep(1);
 		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex);
+		simulatePhase("At Gate", f, randspeed, mutex, atcController);
 
         //if (!checkGroundFaults(f))
         //{
             sleep(1);
             randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex);
+            simulatePhase("Taxi", f, randspeed, mutex, atcController);
         //}
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex);
+		simulatePhase("Takeoff Roll", f, randspeed, mutex, atcController);
 
 		runway->setOccupied(false);
 		pthread_mutex_unlock(mutex);
@@ -172,11 +175,11 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex);
+		simulatePhase("Climb", f, randspeed, mutex, atcController);
 
 		sleep(1);
 		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex);
+		simulatePhase("Departure", f, randspeed, mutex, atcController);
 	}
 
 	// pthread_mutex_lock(mutex);

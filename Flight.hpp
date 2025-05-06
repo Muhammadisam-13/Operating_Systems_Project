@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include "Runway.hpp"
+#include "Airline.hpp"
 #include "Aircraft.hpp"
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
@@ -8,6 +9,8 @@
 
 using namespace std;
 using namespace sf;
+
+class Airline;
 
 class Flight {
 	// New data members
@@ -23,6 +26,8 @@ class Flight {
 	Runway* assignedRunwayPtr;
 	Aircraft aircraft;
 
+    Airline* parentAirline;
+
     // SFML
     Sprite sprite;
     Texture texture;
@@ -30,13 +35,13 @@ class Flight {
 
     
 public:
-	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr), priority(3) {}
+	Flight() : speed(0), AVNStatus(false), assignedRunwayPtr(nullptr), priority(3), parentAirline(NULL) {}
 
 	Flight(string flightID, string flightType, string direction, int speed,
 		string currentPhase, Runway* runwayPtr, Aircraft aircraft)
 		: flightID(flightID), flightType(flightType), direction(direction),
 		speed(speed), currentPhase(currentPhase), assignedRunwayPtr(runwayPtr),
-		AVNStatus(false), aircraft(aircraft)
+		AVNStatus(false), aircraft(aircraft), parentAirline(NULL)
         {
             textureRect = new IntRect(); 
             if(flightType == "Passenger")
@@ -220,4 +225,7 @@ public:
 	void setSpeed(int s) { speed = s; }
 	string getScheduledTime() const { return scheduledTime; }
 	void setScheduledTime(const string& time) { scheduledTime = time; }
+
+    void setParentAirline(Airline* airline) { parentAirline = airline; }
+    Airline* getParentAirline() const { return parentAirline; }
 };

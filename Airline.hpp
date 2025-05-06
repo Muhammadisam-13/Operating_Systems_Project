@@ -40,4 +40,16 @@ public:
 	string getName() const {
 		return name;
 	}
+
+	string getType() const {
+        return type;
+    }
+    
+    int getNumAircrafts() const {
+        return numAircrafts;
+    }
+    
+    void setNumAircrafts(int num) {
+        numAircrafts = num;
+    }
 };
