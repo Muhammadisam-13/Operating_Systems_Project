@@ -98,6 +98,7 @@ public:
 
 	void print() const {
 		cout << "\033[1;36m" << "--- Flight " << flightID << " Status ---" << "\033[0m" << endl;
+        cout << "Airline: " << parentAirline->getName() << endl;
 		cout << "Flight ID: " << flightID << endl;
 		cout << "Flight Type: " << flightType << endl;
 		cout << "Direction: " << direction << endl;

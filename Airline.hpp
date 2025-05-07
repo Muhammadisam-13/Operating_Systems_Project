@@ -21,6 +21,7 @@ public:
 	void addFlight(Flight* flight) {
 		flights.push_back(flight);
 		numFlights = flights.size();
+		flight->setParentAirline(this);
 	}
 
 	void print() const {

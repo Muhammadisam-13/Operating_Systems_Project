@@ -28,7 +28,7 @@ public:
 
     AVN* createAVN(Flight* flight, int recordedSpeed, int allowedHigh, int allowedLow)
     {
-        string airlinename = "Unkoown";
+        string airlinename = "Unknown";
         if(flight->getParentAirline() != NULL)
         {
             airlinename = flight->getParentAirline()->getName();

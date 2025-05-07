@@ -18,16 +18,15 @@ pthread_mutex_t mutexB;
 pthread_mutex_t mutexC;
 pthread_mutex_t print_mutex;
 
-void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex) 
-{
+void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* print_mutex) {
     f->setCurrentPhase(phase);
     f->setSpeed(randomspeed);
     
-    pthread_mutex_lock(mutex);
+    pthread_mutex_lock(print_mutex);
     cout << "\033[1;33m" << f->getID() << " entering " << phase << " phase at " << randomspeed << " km/h \033[0m" << endl;
     f->print();
     cout << endl;
-    pthread_mutex_unlock(mutex);
+    pthread_mutex_unlock(print_mutex);
     
     // Check for speed violations
     bool isViolation = false;
@@ -112,116 +111,68 @@ void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mu
     
     // If violation detected, send it to AVN process via pipe
     if (isViolation) {
+        pthread_mutex_lock(print_mutex);
         cout << red << "VIOLATION DETECTED in simulation: " << f->getID()
             << " - " << phase << " phase at " << randomspeed << " km/h (limit: " << allowedSpeedHigh << " - "
             << allowedSpeedLow << " km/h)" << default_text << endl;
-            
+        pthread_mutex_unlock(print_mutex);
+        
         // Get airline name
         string airlineName = "Unknown";
         if (f->getParentAirline() != NULL) {
             airlineName = f->getParentAirline()->getName();
         }
-
-		pthread_mutex_t violation_mutex;
-        pthread_mutex_init(&violation_mutex, NULL);
-        pthread_mutex_lock(&violation_mutex);
         
-        // Use a separate thread to send violation to avoid blocking
-        pthread_t violation_thread;
-        struct ViolationData {
-            string id;
-            string airline;
-            string flightType;
-            int speed;
-            int minSpeed;
-            int maxSpeed;
-            string phase;
-        };
-        
-        ViolationData* data = new ViolationData{
-            f->getID(),
-            airlineName,
-            f->getFlightType(),
-            randomspeed,
-            allowedSpeedLow,
-            allowedSpeedHigh,
-            phase
-        };
-        
-        pthread_create(&violation_thread, NULL, [](void* arg) -> void* {
-            ViolationData* data = static_cast<ViolationData*>(arg);
+        // Use safer approach to violation reporting
+        try {
+            bool success = sendViolationToAVNProcess(
+                f->getID().c_str(),
+                airlineName.c_str(),
+                f->getFlightType().c_str(),
+                randomspeed,
+                allowedSpeedLow,
+                allowedSpeedHigh,
+                phase.c_str()
+            );
             
-            // Try to send violation with a timeout
-            bool success = false;
-            int retries = 3;
-            
-            while (retries > 0 && !success) {
-                try {
-                    // Add timeout or non-blocking mode
-                    success = sendViolationToAVNProcess(
-                        data->id.c_str(),
-                        data->airline.c_str(),
-                        data->flightType.c_str(),
-                        data->speed,
-                        data->minSpeed,
-                        data->maxSpeed,
-                        data->phase.c_str()
-                    );
-                } catch (...) {
-                    // Handle any exceptions
-                    cout << red << "Error sending violation to AVN process, retrying..." << default_text << endl;
-                }
+            if (success) {
+                pthread_mutex_lock(print_mutex);
+                cout << "Successfully sent violation for flight " << f->getID() << " to AVN Process" << endl;
+                pthread_mutex_unlock(print_mutex);
                 
-                if (!success) {
-                    retries--;
-                    // Short sleep before retry
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                }
+                // Mark flight as having an AVN
+                f->setAVNStatus(true);
             }
-            
-            if (!success) {
-                cout << red << "Failed to send violation to AVN process after retries!" << default_text << endl;
-            }
-            
-            delete data;
-            return nullptr;
-        }, data);
-        
-        // Detach thread to avoid having to join it later
-        pthread_detach(violation_thread);
-        pthread_mutex_unlock(&violation_mutex);
-        
-        // Mark flight as having an AVN
-        f->setAVNStatus(true);
+        } catch (...) {
+            pthread_mutex_lock(print_mutex);
+            cout << red << "Error sending violation to AVN process" << default_text << endl;
+            pthread_mutex_unlock(print_mutex);
+        }
     }
-    
 }
 
-void* handleFlight(void* arg) 
-{
-	Flight* f = (Flight*)arg;
-	Runway* runway = f->getAssignedRunwayPtr();
-
-	pthread_mutex_t* mutex = nullptr;
-
-	// Check which mutex to lock based on runway id
-	if (runway->getRunwayID() == "RWY-A") {
-		mutex = &mutexA;
-	}
-	else if (runway->getRunwayID() == "RWY-B") {
-		mutex = &mutexB;
-	}
-	else if (runway->getRunwayID() == "RWY-C") {
-		mutex = &mutexC;
-	}
-
-	// pthread_mutex_lock(mutex);
-	
-
+void* handleFlight(void* arg) {
+    Flight* f = (Flight*)arg;
+    Runway* runway = f->getAssignedRunwayPtr();
+    
+    pthread_mutex_t* runway_mutex = nullptr;
+    
+    // Check which mutex to lock based on runway id
+    if (runway->getRunwayID() == "RWY-A") {
+        runway_mutex = &mutexA;
+    }
+    else if (runway->getRunwayID() == "RWY-B") {
+        runway_mutex = &mutexB;
+    }
+    else if (runway->getRunwayID() == "RWY-C") {
+        runway_mutex = &mutexC;
+    }
+    
+    // Lock print_mutex for output
+    pthread_mutex_lock(&print_mutex);
     cout << yellow << "[ " << f->getID() << " ] Requesting runway " << runway->getRunwayID() << default_text << "\n";
-
-    switch (f->getPriority())
-    {
+    
+    switch (f->getPriority()) {
     case 0:
         cout << red << "Emergency Priority!" << default_text;
         break;
@@ -235,134 +186,113 @@ void* handleFlight(void* arg)
         break;
     }
     cout << endl;
-
-	// sleep(1);
-	// pthread_mutex_lock(mutex); // arrived flight locks the runway and other flights wait until the first one unlocks
-
-	if(!runway->isOccupied()){
-		cout << green << "[ " << f->getID() << " ] Runway assigned.\n" << default_text;
-		runway->setOccupied(true);
-	}
-
-
-	// sleep(1);
-
-	int randspeed;
-
-
-	if (f->getDirection() == "North" || f->getDirection() == "South") {
-		sleep(1);
-		randspeed = rand() % 500 + 100;
-		simulatePhase("Holding", f, randspeed, mutex);
-
-		sleep(1);
-		randspeed = rand() % 260 + 40;
-		simulatePhase("Approach", f, randspeed, mutex);
-
-		pthread_mutex_lock(mutex);
-		sleep(2);
-		randspeed = rand() % 200;
-		simulatePhase("Landing", f, randspeed, mutex);
-
-		// unlock runway 
-		runway->setOccupied(false);
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
-		
-
-
-		sleep(1);
-		randspeed = rand() % 20;
-		simulatePhase("Taxi", f, randspeed, mutex);
-
-        //if (!checkGroundFaults(f)) 
-        //{
-            sleep(1);
-            randspeed = rand() % 2;
-            simulatePhase("At Gate", f, randspeed, mutex);
-
-            // Check for ground faults at gate
-            //checkGroundFaults(f);
-        //}
-	}
-	else if (f->getDirection() == "East" || f->getDirection() == "West") {
-		sleep(1);
-		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex);
+    pthread_mutex_unlock(&print_mutex);
+    
+    // Try to acquire the runway mutex - this is where flights wait if the runway is occupied
+    pthread_mutex_lock(runway_mutex);
+    
+    if (!runway->isOccupied()) {
+        pthread_mutex_lock(&print_mutex);
+        cout << green << "[ " << f->getID() << " ] Runway assigned.\n" << default_text;
+        pthread_mutex_unlock(&print_mutex);
+        runway->setOccupied(true);
+    }
+    
+    int randspeed;
+    
+    if (f->getDirection() == "North" || f->getDirection() == "South") {
+        // Arrivals use RWY-A
+        sleep(1);
+        randspeed = rand() % 500 + 100;
+        simulatePhase("Holding", f, randspeed, &print_mutex);  // Use print_mutex here instead of runway_mutex
         
-        //if (!checkGroundFaults(f))
-        //{
-            sleep(1);
-            randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex);
-        //}
-
-		pthread_mutex_lock(mutex);
-		sleep(2);
-		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex);
-
-		// unlock runway 
-		runway->setOccupied(false);
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
-
-
-		sleep(1);
-		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex);
-
-		sleep(1);
-		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex);
-	}
-	else { //  Runway C
-		sleep(1);
-		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex);
-
-        //if (!checkGroundFaults(f))
-        //{
-            sleep(1);
-            randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex);
-        //}
-
-		pthread_mutex_lock(mutex);
-		sleep(2);
-		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex);
-
-		runway->setOccupied(false);
-		pthread_mutex_unlock(mutex);
-		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
-
-		sleep(1);
-		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex);
-
-		sleep(1);
-		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex);
-	}
-
-	// pthread_mutex_lock(mutex);
-	// runway->setOccupied(false);
-
-	if(runway->getRunwayID() == "RWY-A"){
-		cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
-	}
-	else if(runway->getRunwayID() == "RWY-B"){
-		cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
-	}
-	else if(runway->getRunwayID() == "RWY-C"){
-		cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
-	}
-
-	// pthread_mutex_unlock(mutex);
-	pthread_exit(NULL);
-
+        sleep(1);
+        randspeed = rand() % 260 + 40;
+        simulatePhase("Approach", f, randspeed, &print_mutex);
+        
+        // No need to lock runway_mutex again - we already have it locked from above
+        sleep(2);
+        randspeed = rand() % 200;
+        simulatePhase("Landing", f, randspeed, &print_mutex);
+        
+        // Unlock runway after landing
+        runway->setOccupied(false);
+        pthread_mutex_lock(&print_mutex);
+        cout << green << "------RUNWAY-A IS FREE------" << default_text << endl;
+        pthread_mutex_unlock(&print_mutex);
+        pthread_mutex_unlock(runway_mutex);  // Release the runway mutex
+        
+        sleep(1);
+        randspeed = rand() % 20;
+        simulatePhase("Taxi", f, randspeed, &print_mutex);
+        
+        sleep(1);
+        randspeed = rand() % 2;
+        simulatePhase("At Gate", f, randspeed, &print_mutex);
+    }
+    else if (f->getDirection() == "East" || f->getDirection() == "West") {
+        // Departures use RWY-B
+        sleep(1);
+        randspeed = 0;
+        simulatePhase("At Gate", f, randspeed, &print_mutex);
+        
+        sleep(1);
+        randspeed = rand() % 20;
+        simulatePhase("Taxi", f, randspeed, &print_mutex);
+        
+        // No need to lock runway_mutex again - we already have it locked from above
+        sleep(2);
+        randspeed = rand() % 290;
+        simulatePhase("Takeoff Roll", f, randspeed, &print_mutex);
+        
+        // Unlock runway after takeoff
+        runway->setOccupied(false);
+        pthread_mutex_lock(&print_mutex);
+        cout << green << "------RUNWAY-B IS FREE------" << default_text << endl;
+        pthread_mutex_unlock(&print_mutex);
+        pthread_mutex_unlock(runway_mutex);  // Release the runway mutex
+        
+        sleep(1);
+        randspeed = rand() % 250 + 200;
+        simulatePhase("Climb", f, randspeed, &print_mutex);
+        
+        sleep(1);
+        randspeed = rand() % 300 + 600;
+        simulatePhase("Departure", f, randspeed, &print_mutex);
+    }
+    else { // Runway C
+        sleep(1);
+        randspeed = 0;
+        simulatePhase("At Gate", f, randspeed, &print_mutex);
+        
+        sleep(1);
+        randspeed = rand() % 20;
+        simulatePhase("Taxi", f, randspeed, &print_mutex);
+        
+        // No need to lock runway_mutex again - we already have it locked from above
+        sleep(2);
+        randspeed = rand() % 290;
+        simulatePhase("Takeoff Roll", f, randspeed, &print_mutex);
+        
+        // Unlock runway after takeoff
+        runway->setOccupied(false);
+        pthread_mutex_lock(&print_mutex);
+        cout << green << "------RUNWAY-C IS FREE------" << default_text << endl;
+        pthread_mutex_unlock(&print_mutex);
+        pthread_mutex_unlock(runway_mutex);  // Release the runway mutex
+        
+        sleep(1);
+        randspeed = rand() % 250 + 200;
+        simulatePhase("Climb", f, randspeed, &print_mutex);
+        
+        sleep(1);
+        randspeed = rand() % 300 + 600;
+        simulatePhase("Departure", f, randspeed, &print_mutex);
+    }
+    
+    pthread_exit(NULL);
 }
+
 
 struct FlightComparator
 {
@@ -918,6 +848,7 @@ class ATC {
 			}
 	
 			newFlight->setAssignedRunwayPtr(runwayPtr);
+			airlinePtr->addFlight(newFlight);
 	
 			if (newFlight->getDirection() == "North" || newFlight->getDirection() == "South") {
 				arrivalQueue.push(newFlight);
@@ -925,7 +856,6 @@ class ATC {
 			else if (newFlight->getDirection() == "East" || newFlight->getDirection() == "West") {
 				departureQueue.push(newFlight);
 			}
-			airlinePtr->addFlight(newFlight);
 			allFlights.push_back(newFlight);
 	
 			cout << green << "Added new flight " << newFlightId << " scheduled for " << scheduledTime << default_text << endl;
@@ -1007,22 +937,22 @@ class ATC {
 	
 		void simulateFlights() {
 			cout << "=== FLIGHT SIMULATION WITH THREADS AND MUTEXES ===" << endl;
-	
+			
 			simulationStartTime = std::chrono::steady_clock::now();
 			simulationEnded = false;
-	
+			
 			// Create a thread for the timer
 			pthread_t timerThread;
 			pthread_create(&timerThread, NULL, [](void* arg) -> void* {
 				ATC* atc = static_cast<ATC*>(arg);
-	
+				
 				while (true) {
 					auto currentTime = std::chrono::steady_clock::now();
 					auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(
 						currentTime - atc->simulationStartTime).count();
-	
+					
 					int remainingSeconds = atc->SIMULATION_DURATION_SECONDS - elapsedSeconds;
-	
+					
 					if (remainingSeconds <= 0) {
 						pthread_mutex_lock(&print_mutex);
 						cout << red << "\n=== SIMULATION TIME EXPIRED (5 MINUTES) ===" << default_text << endl;
@@ -1030,27 +960,25 @@ class ATC {
 						atc->simulationEnded = true;
 						break;
 					}
-	
+					
 					// Update status every 15 seconds
-					if (elapsedSeconds % 15 == 0)
-					{
+					if (elapsedSeconds % 15 == 0) {
 						pthread_mutex_lock(&print_mutex);
 						cout << yellow << "\n=== SIMULATION TIME: " << elapsedSeconds
-						<< " seconds / " << remainingSeconds << " seconds remaining ==="
-						<< default_text << endl;
+							<< " seconds / " << remainingSeconds << " seconds remaining ==="
+							<< default_text << endl;
 						pthread_mutex_unlock(&print_mutex);
-					
-						// Display comprehensive status
+						
+						// Display comprehensive status - moved outside the lock to prevent deadlocks
 						atc->displayFlightStatus();
-					
+						
 						// Update wait times
 						atc->updateEstimatedWaitTimes();
 					}
-	   
-					std::this_thread::sleep_for(std::chrono::seconds(1));
 					
-					}
-			return nullptr;
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+				}
+				return nullptr;
 			}, this);
 	
 			// Generate random emergencies
