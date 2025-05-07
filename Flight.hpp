@@ -25,6 +25,8 @@ class Flight {
 	bool AVNStatus;
 	Runway* assignedRunwayPtr;
 	Aircraft aircraft;
+    bool runwayGiven;
+    bool isActive;
 
     // SFML
     float angle;
@@ -40,15 +42,20 @@ public:
 		string currentPhase, Runway* runwayPtr, Aircraft aircraft)
 		: flightID(flightID), flightType(flightType), direction(direction),
 		speed(speed), currentPhase(currentPhase), assignedRunwayPtr(runwayPtr),
-		AVNStatus(false), aircraft(aircraft)
+		AVNStatus(false), aircraft(aircraft), runwayGiven(false), isActive(true)
         {
-            sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+            // sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
             textureRect = new IntRect(); 
             if(flightType == "Passenger")
             {
                 priority = 3;
                 texture.loadFromFile("plane.png");
-                *textureRect = IntRect(0, 0, 128, 170);
+                if(runwayPtr->getRunwayID() == "RWY-A"){
+                    *textureRect = IntRect(284, 0, 138, 170);
+                }
+                else if(runwayPtr->getRunwayID() == "RWY-B"){
+                    *textureRect = IntRect(0, 0, 128, 170);
+                }
             }
             else if(flightType == "Cargo")
             {
@@ -60,7 +67,7 @@ public:
             {
                 priority = 1;
                 texture.loadFromFile("militarysprite.png");
-                *textureRect = IntRect(0, 0, 160, 80); // Adjust these values
+                *textureRect = IntRect(0, 0, 200, 150.5); // Adjust these values
             }
             else if (flightType == "Medical") 
             {
@@ -68,6 +75,7 @@ public:
                 texture.loadFromFile("militarysprite.png");
                 *textureRect = IntRect(0, 170, 100, 80); // Adjust these values
             }
+            sprite.setScale(0.75, 0.75);
             sprite.setTexture(texture);
             sprite.setTextureRect(*textureRect);
             setPath();
@@ -85,56 +93,46 @@ public:
         sprite.setTexture(texture);
         return true;
     }
+    void setAngle(bool ang){
+        this->angle = ang;
+    }
+    void setSpriteRotation(float angle){
+        sprite.setRotation(angle);
+    }
+    bool getAngle() const{
+        return angle;
+    }
+    void setActive(bool act){
+        this->isActive = act;
+    }
+    bool getActive() const{
+        return isActive;
+    }
 
     void setPath() {
         if (assignedRunwayPtr->getRunwayID() == "RWY-A")
         {
-            if (direction == "North")
+            sprite.setRotation(90);
+            if (direction == "North" || direction == "South")
             {
-                path.push_back(Vector2f(617, 214));  //approx
-                path.push_back(Vector2f(617, 300));
-                path.push_back(Vector2f(617, 400));
-            }
-            else if (direction == "South")
-            {
-                path.push_back(Vector2f(617, 400));
-                path.push_back(Vector2f(617, 300));
-                path.push_back(Vector2f(617, 214));
+                sprite.setPosition(-600, 350);
             }
         }
         else if (assignedRunwayPtr->getRunwayID() == "RWY-B")
         {
-            if (direction == "East")
+            if (direction == "East" || direction == "West")
             {
-                path.push_back(Vector2f(770, 500));
-                path.push_back(Vector2f(850, 500));
-                path.push_back(Vector2f(950, 500));
-                path.push_back(Vector2f(1050, 500));
-                path.push_back(Vector2f(1150, 500));
+                sprite.setPosition(1100 + rand() % 250, 650);
             }
-            else if (direction == "West")
-            {
-                path.push_back(Vector2f(770, 500));
-                path.push_back(Vector2f(670, 500));
-                path.push_back(Vector2f(570, 500));
-                path.push_back(Vector2f(470, 500));
-                path.push_back(Vector2f(370, 500));
-            }
+            
         }
         else if (assignedRunwayPtr->getRunwayID() == "RWY-C")
         {
-            if (direction == "North")
-            {
-                path.push_back(Vector2f(250, 100));
-                path.push_back(Vector2f(250, 200));
-                path.push_back(Vector2f(250, 300));
-                
+            if(currentPhase == "At Gate"){
+                sprite.setPosition(1200 + rand() % 200, 750);
             }
-            else if (direction == "South")
-            {
-                path.push_back(Vector2f(250, 300));
-                path.push_back(Vector2f(250, 200));
-                path.push_back(Vector2f(250, 100));
+            else if(currentPhase == "Holding"){
+                sprite.setPosition(-1000 + rand() % 250, 725);
             }
         }
     }
@@ -145,37 +143,44 @@ public:
     {
         return sprite;
     }
+    bool isRunwayAllocated() const{
+        return runwayGiven;
+    }
 
     void setSpritePos(int x, int y){
         sprite.setPosition(x, y);
     }
     
-    void move() {
-        float speedFactor = speed / 100.0f;
-        if (currentPhase != "At Gate") {
-            if (path.size() > 0)
-            {
-                Vector2f target = path[0];
-                Vector2f currentPos = sprite.getPosition();
-                float dx = target.x - currentPos.x;
-                float dy = target.y - currentPos.y;
-                float distance = sqrt(dx * dx + dy * dy);
+    
+    void move(sf::Clock clk = Clock()){
 
-                if (distance > speedFactor)
-                {
-                    angle = atan2(dy, dx) * 180 / 3.14159265;
-                    sprite.setRotation(90);
-                    currentPos.x += speedFactor * cos(angle * 3.14159265 / 180.0f);
-                    currentPos.y += speedFactor * sin(angle * 3.14159265 / 180.0f);
-                    sprite.setPosition(currentPos);
-                }
-                else
-                {
-                    sprite.setPosition(target);
-                    path.erase(path.begin());
-                }
-            }
+        Clock clk1;
+        clk1.restart();
+        float speedFactor = speed / 100.0f;
+        float taxiSpeed = speed / 300.0f;
+        int xpos = sprite.getPosition().x, ypos = sprite.getPosition().y;
+
+        
+
+        //  // landing or takeoff phase
+        //  while(clk1.getElapsedTime().asSeconds() < 3){
+        //     if(assignedRunwayPtr->getRunwayID() == "RWY-A"){     
+        //         xpos += speedFactor;
+        //     }
+        //     else if(assignedRunwayPtr->getRunwayID() == "RWY-B"){
+        //         xpos -= speedFactor;
+        //     }
+        //     sprite.setPosition(xpos, ypos);
+        // }
+       
+        if(assignedRunwayPtr->getRunwayID() == "RWY-A"){     
+            xpos += speedFactor;
         }
+        else if(assignedRunwayPtr->getRunwayID() == "RWY-B"){
+            xpos -= speedFactor;
+        }
+
+        sprite.setPosition(xpos, ypos);
     }
 
 	void print() const {
