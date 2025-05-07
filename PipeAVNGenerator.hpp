@@ -56,3 +56,4 @@ public:
 void sendAVNToPipe(AVN* avn);
 void* receiveStatusUpdates(void* arg);
 void cleanupPipes(int signal);
+void initializePipes();

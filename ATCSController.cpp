@@ -15,6 +15,12 @@ void ATCSController::addFlight(Flight* flight) {
 }
 
 void ATCSController::detectViolations(Flight* flight) {
+
+    if (flight == nullptr) 
+    {
+        cout << "Error: Null flight pointer in detectViolations" << endl;
+        return;
+    }
     string phase = flight->getCurrentPhase();
     int speed = flight->getSpeed();
     int allowedSpeedHigh = 0;
@@ -100,11 +106,17 @@ void ATCSController::detectViolations(Flight* flight) {
         flight->setAVNStatus(true);
         violatingFlights.push_back(flight);
 
-        AVN* newAVN = avnGenerator->createAVN(flight, speed, allowedSpeedHigh, allowedSpeedLow);
-
-        cout << red << "VIOLATION DETECTED: " << flight->getID()
-        << " - " << phase << "phase at" << speed << "km/h (limit: " << allowedSpeedHigh << " - "
-        << allowedSpeedLow << "km/h)" << default_text << endl; 
+        if (avnGenerator != nullptr) 
+        {
+            AVN* newAVN = avnGenerator->createAVN(flight, speed, allowedSpeedHigh, allowedSpeedLow);
+            
+            cout << red << "VIOLATION DETECTED: " << flight->getID()
+                << " - " << phase << " phase at " << speed << " km/h (limit: " << allowedSpeedHigh << " - "
+                << allowedSpeedLow << " km/h)" << default_text << endl;
+        } else 
+        {
+            cout << "Error: AVN Generator is null!" << endl;
+        }
     }
 }
 

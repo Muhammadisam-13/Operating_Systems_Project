@@ -316,7 +316,7 @@ AirlinePortal* airlinePortal = nullptr;
 void sendStatusUpdate(const char* avnID, const char* status, const char* flightNumber) 
 {
     // Open pipe for writing
-    int pipe_fd = open(AIRLINE_TO_ATC_PIPE, O_WRONLY);
+    int pipe_fd = open(AIRLINE_TO_ATC_PIPE, O_WRONLY | O_NONBLOCK);
     if (pipe_fd == -1) 
     {
         perror("Error opening status pipe for writing");
@@ -348,7 +348,7 @@ void* receiveAVNs(void* arg)
     AirlinePortal* portal = (AirlinePortal*)arg;
     
     // Open pipe for reading
-    int pipe_fd = open(ATC_TO_AIRLINE_PIPE, O_RDONLY);
+    int pipe_fd = open(ATC_TO_AIRLINE_PIPE, O_RDONLY  | O_NONBLOCK);
     if (pipe_fd == -1) 
     {
         perror("Error opening pipe for reading");

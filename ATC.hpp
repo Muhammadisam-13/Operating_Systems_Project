@@ -17,7 +17,7 @@ pthread_mutex_t mutexA;
 pthread_mutex_t mutexB;
 pthread_mutex_t mutexC;
 pthread_mutex_t print_mutex;
-ATCSController* atcController;
+ATCSController* atcController = new ATCSController();
 
 void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex, ATCSController* atcControllerr) 
 {
@@ -30,7 +30,14 @@ void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mu
     cout << endl;
     pthread_mutex_unlock(mutex);
     
-    atcControllerr->detectViolations(f);
+	if (atcControllerr != nullptr) 
+	{
+        atcControllerr->detectViolations(f);
+    } 
+	else 
+	{
+        cout << "Warning: ATC Controller is null!" << endl;
+    }
 }
 
 void* handleFlight(void* arg) 
