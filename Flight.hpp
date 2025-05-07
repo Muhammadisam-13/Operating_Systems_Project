@@ -213,8 +213,10 @@ public:
 	bool getAVNStatus() const { return AVNStatus; }
     void setAVNStatus(bool status) {AVNStatus = status;} 
 	string getID() const { return flightID; }
+    void setID(string id) { flightID = id; }
 	string getDirection() const { return direction; }
 	string getFlightType() const { return flightType; }
+    void setFlightType(string type) { flightType = type;}
 	int getPriority() const { return priority; }
 	void setPriority(const int& p) { priority = p; }
 	Runway* getAssignedRunwayPtr() const { return assignedRunwayPtr; }

@@ -35,6 +35,8 @@ struct StatusMessage {
 // Define pipe names as constants
 #define ATC_TO_AIRLINE_PIPE "atc_to_airline_pipe"
 #define AIRLINE_TO_ATC_PIPE "airline_to_atc_pipe"
+#define SIM_TO_AVN_PIPE "sim_to_avn_pipe"
+
 
 // Pipe AVN Generator
 class PipeAVNGenerator : public AVNGenerator {

@@ -1,5 +1,5 @@
 
-g++ test.cpp ATCSController.cpp AVN_Process.cpp \
+g++ test.cpp ATC_to_AVN.cpp \
     -o test -lsfml-graphics -lsfml-window -lsfml-system -lpthread
 
 # Run the program

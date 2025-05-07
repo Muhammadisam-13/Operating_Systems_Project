@@ -11,6 +11,7 @@
 #include "AVN.hpp"
 #include "PipeAVNGenerator.hpp"  // Include the new header
 #include "ATCSController.hpp"    // Now we can include the full ATCSController
+#include "ATC_to_AVN.hpp"
 #include "Airline.hpp"
 #include "Colors.hpp"
 
@@ -18,8 +19,12 @@ using namespace std;
 
 int fd_atc_to_airline = -1;
 int fd_airline_to_atc = -1;
+int fd_atc_to_avn = -1;
 pthread_t receive_thread;
 bool pipes_initialized = false;
+PipeAVNGenerator* avnGenerator = nullptr;
+pthread_t sim_receiver_thread;
+bool running = true;
 
 bool fileExists(const char* filename) {
     struct stat buffer;
@@ -40,6 +45,7 @@ void initializePipes()
         close(fd_airline_to_atc);
         fd_airline_to_atc = -1;
     }
+
     
     // Remove any existing pipes with better error reporting
     if (fileExists(ATC_TO_AIRLINE_PIPE)) {
@@ -144,7 +150,10 @@ PipeAVNGenerator::PipeAVNGenerator(ATCSController* controller) : atcController(c
     std::cout << "Creating PipeAVNGenerator..." << std::endl;
     
     // Try to initialize pipes but handle failures gracefully
-    initializePipes();
+    if(!pipes_initialized)
+    {
+        initializePipes();
+    }
     
     if (pipes_initialized) 
     {
@@ -172,20 +181,6 @@ PipeAVNGenerator::~PipeAVNGenerator()
 }
 
 AVN* PipeAVNGenerator::createAVN(Flight* flight, int recordedSpeed, int allowedHigh, int allowedLow) {
-
-    std::cout << "Creating AVN for flight " << flight->getID() << std::endl;
-
-    // Try initializing pipes if not already done
-    if (!pipes_initialized) 
-    {
-        std::cout << "Pipes not initialized, attempting to initialize..." << std::endl;
-        initializePipes();
-        
-        if (!pipes_initialized) 
-        {
-            std::cout << "Pipe initialization failed, continuing without pipe communication" << std::endl;
-        }
-    }
     
     // Create AVN using parent class method
     AVN* newAVN = AVNGenerator::createAVN(flight, recordedSpeed, allowedHigh, allowedLow);
@@ -387,4 +382,153 @@ void* receiveStatusUpdates(void* arg)
     }
     
     return NULL;
+}
+
+void* receiveViolationsFromAVN(void* arg);
+void cleanupAndExit(int signal);
+
+int main()
+{
+    cout << green << "AVN Process started" << default_text << endl;
+    
+    // Register signal handler for cleanup
+    signal(SIGINT, cleanupAndExit);
+    
+    // Create ATCSController (this would normally be a stub or mock in the standalone process)
+    ATCSController* atcController = new ATCSController();
+    
+    // Create AVN Generator that will communicate with the Airline process
+    avnGenerator = new PipeAVNGenerator(atcController);
+    avnGenerator->setATCController(atcController);
+    
+    cout << yellow << "Initializing connection with Simulation process..." << default_text << endl;
+    
+
+    // Initialize pipe to receive violations from ATC/Simulation
+    
+    // Create thread to receive violation messages from Simulation/ATC
+    if (pthread_create(&sim_receiver_thread, NULL, receiveViolationsFromAVN, (void*)avnGenerator) != 0) {
+        perror("Failed to create simulation receiver thread");
+        cleanupAndExit(0);
+        return 1;
+    }
+    
+    cout << green << "AVN Process ready and waiting for violations" << default_text << endl;
+    cout << "Press Ctrl+C to exit" << endl;
+    
+    // Main loop - keep process running and handle user commands
+    string command;
+    while (running) {
+        cout << "> ";
+        getline(cin, command);
+        
+        if (command == "exit" || command == "quit") {
+            break;
+        }
+        else if (command == "list") {
+            // Display issued AVNs
+            vector<AVN*> avns = avnGenerator->getIssuedAVNs();
+            cout << "\n===== Issued AVNs =====" << endl;
+            if (avns.empty()) {
+                cout << "No AVNs issued yet" << endl;
+            } else {
+                for (auto* avn : avns) {
+                    cout << "AVN ID: " << avn->getAVNID() << endl;
+                    cout << "Flight: " << avn->getFlightNumber() << endl;
+                    cout << "Airline: " << avn->getAirlineName() << endl;
+                    cout << "Status: " << avn->getPaymentStatus() << endl;
+                    cout << "----------------------" << endl;
+                }
+            }
+        }
+        else if (command == "help") {
+            cout << "Available commands:" << endl;
+            cout << "  list - List all issued AVNs" << endl;
+            cout << "  exit - Exit the program" << endl;
+        }
+        else {
+            cout << "Unknown command. Type 'help' for available commands." << endl;
+        }
+    }
+    
+    // Cleanup
+    cleanupAndExit(0);
+    return 0;
+}
+
+void* receiveViolationsFromAVN(void* arg) {
+    PipeAVNGenerator* generator = static_cast<PipeAVNGenerator*>(arg);
+    
+    // Open pipe for reading
+    int pipe_fd = open(SIM_TO_AVN_PIPE, O_RDONLY | O_NONBLOCK);
+    if (pipe_fd == -1) {
+        perror("Error opening SimToAVN pipe for reading");
+        return NULL;
+    }
+    
+    cout << green << "Violation receiver started in AVN Process" << default_text << endl;
+    
+    SimViolationMessage msg;
+    while (running) {
+        ssize_t bytes_read = read(pipe_fd, &msg, sizeof(msg));
+        if (bytes_read > 0) {
+            cout << yellow << "Received violation for flight " << msg.flightID 
+                 << " from Simulation process" << default_text << endl;
+            
+            // Process the violation by creating a Flight object from the message
+            Flight* violatingFlight = new Flight();
+            violatingFlight->setID(msg.flightID);
+            violatingFlight->setParentAirline(NULL);
+            violatingFlight->setFlightType(msg.flightType);
+            
+            // Generate AVN and send it to airline
+            AVN* newAVN = generator->createAVN(
+                violatingFlight,
+                msg.recordedSpeed,
+                msg.allowedSpeedHigh,
+                msg.allowedSpeedLow
+            );
+            
+            cout << cyan << "Created and sent AVN " << newAVN->getAVNID() 
+                 << " to Airline process" << default_text << endl;
+                 
+            // Clean up the temporary flight object
+            delete violatingFlight;
+        } else if (bytes_read < 0 && errno != EAGAIN) {
+            perror("Error reading from SimToAVN pipe");
+            sleep(1);
+        }
+        
+        usleep(100000); // 100ms delay to prevent CPU hogging
+    }
+    
+    close(pipe_fd);
+    return NULL;
+}
+
+void cleanupAndExit(int signal) {
+    cout << "\nShutting down AVN Process..." << endl;
+    
+    // Set running flag to false to stop threads
+    running = false;
+    
+    // Cancel and join the receiver thread
+    pthread_cancel(sim_receiver_thread);
+    pthread_join(sim_receiver_thread, NULL);
+    
+    // Clean up the pipes
+    cleanupPipes(0);
+    
+    // Delete the generator
+    if (avnGenerator) {
+        delete avnGenerator;
+        avnGenerator = nullptr;
+    }
+    
+    cout << green << "AVN Process shutdown complete" << default_text << endl;
+    
+    // Exit if this is a signal handler call
+    if (signal != 0) {
+        exit(0);
+    }
 }

@@ -5,7 +5,7 @@
 #include "Airline.hpp"
 #include <pthread.h>
 #include "Colors.hpp"
-#include "ATCSController.hpp"
+#include "ATC_to_AVN.hpp"
 #include <chrono>
 #include <thread>
 #include <unistd.h>
@@ -17,9 +17,8 @@ pthread_mutex_t mutexA;
 pthread_mutex_t mutexB;
 pthread_mutex_t mutexC;
 pthread_mutex_t print_mutex;
-ATCSController* atcController = new ATCSController();
 
-void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex, ATCSController* atcControllerr) 
+void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mutex) 
 {
     f->setCurrentPhase(phase);
     f->setSpeed(randomspeed);
@@ -30,14 +29,172 @@ void simulatePhase(string phase, Flight* f, int randomspeed, pthread_mutex_t* mu
     cout << endl;
     pthread_mutex_unlock(mutex);
     
-	if (atcControllerr != nullptr) 
-	{
-        atcControllerr->detectViolations(f);
-    } 
-	else 
-	{
-        cout << "Warning: ATC Controller is null!" << endl;
+    // Check for speed violations
+    bool isViolation = false;
+    int allowedSpeedHigh = 0;
+    int allowedSpeedLow = 0;
+    
+    // This code mirrors the violation detection logic from ATCSController::detectViolations
+    if(f->getAssignedRunwayPtr()->getRunwayID() == "RWY-A") {
+        if(phase == "Holding") {
+            allowedSpeedHigh = 600;
+            allowedSpeedLow = 290;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Approach") {
+            allowedSpeedHigh = 290;
+            allowedSpeedLow = 240;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Landing") {
+            allowedSpeedHigh = 240;
+            allowedSpeedLow = 30;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Taxi") {
+            allowedSpeedHigh = 30;
+            allowedSpeedLow = 10;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "At Gate") {
+            allowedSpeedHigh = 10;
+            allowedSpeedLow = 0;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
     }
+    else if(f->getAssignedRunwayPtr()->getRunwayID() == "RWY-B") {
+        if(phase == "At Gate") {
+            allowedSpeedHigh = 10;
+            allowedSpeedLow = 0;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Taxi") {
+            allowedSpeedHigh = 30;
+            allowedSpeedLow = 10;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Takeoff Roll") {
+            allowedSpeedHigh = 290;
+            allowedSpeedLow = 30;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Climb") {
+            allowedSpeedHigh = 463;
+            allowedSpeedLow = 290;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+        else if(phase == "Cruise") {
+            allowedSpeedHigh = 900;
+            allowedSpeedLow = 800;
+            if(randomspeed > allowedSpeedHigh || randomspeed < allowedSpeedLow) {
+                isViolation = true;
+            }
+        }
+    }
+    
+    // If violation detected, send it to AVN process via pipe
+    if (isViolation) {
+        cout << red << "VIOLATION DETECTED in simulation: " << f->getID()
+            << " - " << phase << " phase at " << randomspeed << " km/h (limit: " << allowedSpeedHigh << " - "
+            << allowedSpeedLow << " km/h)" << default_text << endl;
+            
+        // Get airline name
+        string airlineName = "Unknown";
+        if (f->getParentAirline() != NULL) {
+            airlineName = f->getParentAirline()->getName();
+        }
+
+		pthread_mutex_t violation_mutex;
+        pthread_mutex_init(&violation_mutex, NULL);
+        pthread_mutex_lock(&violation_mutex);
+        
+        // Use a separate thread to send violation to avoid blocking
+        pthread_t violation_thread;
+        struct ViolationData {
+            string id;
+            string airline;
+            string flightType;
+            int speed;
+            int minSpeed;
+            int maxSpeed;
+            string phase;
+        };
+        
+        ViolationData* data = new ViolationData{
+            f->getID(),
+            airlineName,
+            f->getFlightType(),
+            randomspeed,
+            allowedSpeedLow,
+            allowedSpeedHigh,
+            phase
+        };
+        
+        pthread_create(&violation_thread, NULL, [](void* arg) -> void* {
+            ViolationData* data = static_cast<ViolationData*>(arg);
+            
+            // Try to send violation with a timeout
+            bool success = false;
+            int retries = 3;
+            
+            while (retries > 0 && !success) {
+                try {
+                    // Add timeout or non-blocking mode
+                    success = sendViolationToAVNProcess(
+                        data->id.c_str(),
+                        data->airline.c_str(),
+                        data->flightType.c_str(),
+                        data->speed,
+                        data->minSpeed,
+                        data->maxSpeed,
+                        data->phase.c_str()
+                    );
+                } catch (...) {
+                    // Handle any exceptions
+                    cout << red << "Error sending violation to AVN process, retrying..." << default_text << endl;
+                }
+                
+                if (!success) {
+                    retries--;
+                    // Short sleep before retry
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+            
+            if (!success) {
+                cout << red << "Failed to send violation to AVN process after retries!" << default_text << endl;
+            }
+            
+            delete data;
+            return nullptr;
+        }, data);
+        
+        // Detach thread to avoid having to join it later
+        pthread_detach(violation_thread);
+        pthread_mutex_unlock(&violation_mutex);
+        
+        // Mark flight as having an AVN
+        f->setAVNStatus(true);
+    }
+    
 }
 
 void* handleFlight(void* arg) 
@@ -96,16 +253,16 @@ void* handleFlight(void* arg)
 	if (f->getDirection() == "North" || f->getDirection() == "South") {
 		sleep(1);
 		randspeed = rand() % 500 + 100;
-		simulatePhase("Holding", f, randspeed, mutex, atcController);
+		simulatePhase("Holding", f, randspeed, mutex);
 
 		sleep(1);
 		randspeed = rand() % 260 + 40;
-		simulatePhase("Approach", f, randspeed, mutex, atcController);
+		simulatePhase("Approach", f, randspeed, mutex);
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 200;
-		simulatePhase("Landing", f, randspeed, mutex, atcController);
+		simulatePhase("Landing", f, randspeed, mutex);
 
 		// unlock runway 
 		runway->setOccupied(false);
@@ -116,13 +273,13 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 20;
-		simulatePhase("Taxi", f, randspeed, mutex, atcController);
+		simulatePhase("Taxi", f, randspeed, mutex);
 
         //if (!checkGroundFaults(f)) 
         //{
             sleep(1);
             randspeed = rand() % 2;
-            simulatePhase("At Gate", f, randspeed, mutex, atcController);
+            simulatePhase("At Gate", f, randspeed, mutex);
 
             // Check for ground faults at gate
             //checkGroundFaults(f);
@@ -131,19 +288,19 @@ void* handleFlight(void* arg)
 	else if (f->getDirection() == "East" || f->getDirection() == "West") {
 		sleep(1);
 		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex, atcController);
+		simulatePhase("At Gate", f, randspeed, mutex);
         
         //if (!checkGroundFaults(f))
         //{
             sleep(1);
             randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex, atcController);
+            simulatePhase("Taxi", f, randspeed, mutex);
         //}
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex, atcController);
+		simulatePhase("Takeoff Roll", f, randspeed, mutex);
 
 		// unlock runway 
 		runway->setOccupied(false);
@@ -153,28 +310,28 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex, atcController);
+		simulatePhase("Climb", f, randspeed, mutex);
 
 		sleep(1);
 		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex, atcController);
+		simulatePhase("Departure", f, randspeed, mutex);
 	}
 	else { //  Runway C
 		sleep(1);
 		randspeed = 0;
-		simulatePhase("At Gate", f, randspeed, mutex, atcController);
+		simulatePhase("At Gate", f, randspeed, mutex);
 
         //if (!checkGroundFaults(f))
         //{
             sleep(1);
             randspeed = rand() % 20;
-            simulatePhase("Taxi", f, randspeed, mutex, atcController);
+            simulatePhase("Taxi", f, randspeed, mutex);
         //}
 
 		pthread_mutex_lock(mutex);
 		sleep(2);
 		randspeed = rand() % 290;
-		simulatePhase("Takeoff Roll", f, randspeed, mutex, atcController);
+		simulatePhase("Takeoff Roll", f, randspeed, mutex);
 
 		runway->setOccupied(false);
 		pthread_mutex_unlock(mutex);
@@ -182,11 +339,11 @@ void* handleFlight(void* arg)
 
 		sleep(1);
 		randspeed = rand() % 250 + 200;
-		simulatePhase("Climb", f, randspeed, mutex, atcController);
+		simulatePhase("Climb", f, randspeed, mutex);
 
 		sleep(1);
 		randspeed = rand() % 300 + 600;
-		simulatePhase("Departure", f, randspeed, mutex, atcController);
+		simulatePhase("Departure", f, randspeed, mutex);
 	}
 
 	// pthread_mutex_lock(mutex);

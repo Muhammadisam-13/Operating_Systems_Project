@@ -1,7 +1,7 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include "ATC.hpp"
-#include "AVN.hpp"
+#include "ATC_to_AVN.hpp"
 using namespace sf;
 
 int main(){
@@ -9,6 +9,7 @@ int main(){
 	// atc.initializeSystem();
 	// atc.simulateFlights();
 
+    initializeSimToAVNPipe();
 	ATC atc;
     atc.initializeSystem();
 
